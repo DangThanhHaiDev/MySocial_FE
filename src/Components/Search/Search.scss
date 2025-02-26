@@ -1,0 +1,17 @@
+.searchContainer{
+    border: 1px solid rgb(220, 220, 220);
+    box-shadow: 0 1px 2px rgb(2, 2, 2);
+    width: 250px;
+    height: 100vh;
+
+    .searchInput{
+        border:none;
+        outline: none;
+        background-color: rgb(242, 242, 242);
+        padding: 5px 10px;
+        font-size: 13px;
+        width: 100%;
+        margin-left: 10px;
+    }
+}
+
