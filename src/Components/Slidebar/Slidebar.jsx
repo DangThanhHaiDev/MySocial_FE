@@ -13,7 +13,9 @@ const Slidebar = () => {
     const navigate = useNavigate()
     const { isOpen, onOpen, onClose } = useDisclosure()
 
-
+    const handleCloseSearch = ()=>{
+        setActiveTab("")
+    }
 
     const handleOnTab = (title) => {
         if (title === "Profile") {
@@ -25,9 +27,7 @@ const Slidebar = () => {
         else if (title === "Create") {
             onOpen()
         }
-
         setActiveTab(title)
-
     }
 
     return (
@@ -55,7 +55,7 @@ const Slidebar = () => {
                 </div>
             </div>
             <CreatePostModal onClose={onClose} isOpen={isOpen} />
-            {activeTab === "Search" && <Search />}
+            {activeTab === "Search" && <Search handleCloseSearch={handleCloseSearch} />}
 
         </div>
     )
