@@ -1,7 +1,7 @@
-import img from '../../Resource/images/ig.png'
+import img from '../../Resource/images/logo.jpg'
 import { IoReorderThree } from "react-icons/io5";
 import SlieItems from "./SlideItems"
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure } from '@chakra-ui/react';
 import CreatePostModal from '../Post/CreatePostModal';
@@ -9,9 +9,14 @@ import Search from "../Search/Search.jsx"
 
 
 const Slidebar = () => {
-    const [activeTab, setActiveTab] = useState()
+    const [activeTab, setActiveTab] = useState("Home")
     const navigate = useNavigate()
     const { isOpen, onOpen, onClose } = useDisclosure()
+
+    useEffect(()=>{
+        navigate("/")
+    }, [])
+
 
     const handleCloseSearch = ()=>{
         setActiveTab("")
@@ -35,7 +40,7 @@ const Slidebar = () => {
             <div className='flex flex-col justify-between h-full'>
                 <div>
                     <div className='pt-10'>
-                        {activeTab !== "Search" && <img src={img} alt="Logo" className='w-40' />}
+                        {activeTab !== "Search" && <img src={img} alt="Logo" className='w-20' />}
                     </div>
                     <div className='mt-10'>
                         {

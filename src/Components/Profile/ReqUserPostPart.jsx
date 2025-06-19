@@ -36,7 +36,6 @@ const ReqUserPostPart = () => {
                         [1, 2, 3, 4, 5, 6,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1].map((item, index) => (
                             <div className="p-2">
                                 <ReqUserPostCard />
-
                             </div>
                         ))
                     }

@@ -1,28 +1,20 @@
-.dropdown{
-    position: relative;
-    display: inline-block;
-    &:hover{
-        .dots{
-            background-color: white;
-        }
-    }
-    .dots{
-        display: inline-block;
-        cursor: pointer;
-    }
-    .dropdown-content{
-        position: absolute;
-        z-index: 1;
-        a{
-            display: block;
-            padding: 8px 16px;
-        }
-    }
+.commentInput {
+  border: none;
+  outline: none;
+  width: 100%;
+  font-size: 0.875rem;
+  padding: 0.25rem;
 }
 
-.commentInput{
-    outline: none;
-    border: none;
-    width: 100%;
-    padding: .5rem .7rem;
+.dropdown-content {
+  position: absolute;
+  top: 1.5rem;
+  right: 0;
+  background-color: black;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  z-index: 10;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }

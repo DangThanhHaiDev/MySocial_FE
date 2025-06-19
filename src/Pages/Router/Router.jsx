@@ -3,8 +3,12 @@ import Slidebar from "../../Components/Slidebar/Slidebar"
 import HomePage from "../HomePage/HomePage"
 import Profile from "../Profile/Profile"
 import Story from "../Story/Story"
+import { useEffect } from "react"
 
+//Private route tưc là route đã đã nhập
 const Router = () => {
+   
+
     return (
         <div>
             <div className="flex">
