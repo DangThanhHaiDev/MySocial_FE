@@ -23,10 +23,10 @@ const HomePage = () => {
 
     const getAllPost = async () => {
         try {
-            const response = await axiosInstance.get(`api/post?id=${1}`)
-            setData(response.data)
-            console.log(response);
-
+            const response = await axiosInstance.get(`api/post?id=${2}`)
+          
+            
+            setData(response.data)                        
         } catch (error) {
 
         }
@@ -39,7 +39,7 @@ const HomePage = () => {
                     <div className='storyDiv flex space-x-5 border p-4 rounded-sm justify-start w-full'>
                         {
                             [1, 2, 3, 4, 5].map((item) => (
-                                <StoryCircle />
+                                <StoryCircle key={item}/>
                             ))
                         }
                     </div>

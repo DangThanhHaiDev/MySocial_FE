@@ -1,5 +1,4 @@
 import ProfileUserDetails from "../../Components/Profile/ProfileUserDetails"
-import ReqUserPostPart from "../../Components/Profile/ReqUserPostPart"
 
 const Profile = () => {
     return (
@@ -8,9 +7,9 @@ const Profile = () => {
                 <div>
                     <ProfileUserDetails />
                 </div>
-                <div>
+                {/* <div>
                     <ReqUserPostPart />
-                </div>
+                </div> */}
             </div>
 
         </div>

@@ -5,12 +5,57 @@ import { AiFillHeart, AiOutlineHeart } from "react-icons/ai"
 import { FaRegComment } from "react-icons/fa"
 import { RiSendPlaneLine } from "react-icons/ri"
 import "./Comment.scss"
+import { useState, useEffect } from "react"
+import axiosInstance from "../../AppConfig/axiosConfig"
+import { useSelector } from "react-redux"
+import SockJS from "sockjs-client"
+import { Stomp } from "@stomp/stompjs"
 
-const CommentModal = ({ onClose, isOpen, isSaved, isPostLiked, handleClickLike, handleClickSave }) => {
+const CommentModal = ({ onClose, isOpen, isSaved, isPostLiked, handleClickLike, handleClickSave, comments, sendComment, postId, commentTreeReloadKey }) => {
+    const [commentText, setCommentText] = useState("")
+    const [commentTree, setCommentTree] = useState([])
+    const user = useSelector(state => state.auth.user)
+    const postOwnerId = commentTree.length > 0 && commentTree[0].postOwnerId ? commentTree[0].postOwnerId : (comments && comments[0] && comments[0].postOwnerId ? comments[0].postOwnerId : null)
+
+    useEffect(() => {
+        if (isOpen && postId) {
+            axiosInstance.get(`/api/comment/posts/${postId}`)
+                .then(res => setCommentTree(Array.isArray(res.data) ? res.data : []))
+                .catch(() => setCommentTree([]))
+        }
+    }, [isOpen, postId, commentTreeReloadKey, comments])
+
+    const handleSendComment = () => {
+        sendComment(commentText, null)
+        setCommentText("")
+    }
+
+    const handleReply = (replyText, parentId) => {
+        sendComment(replyText, parentId)
+    }
+
+    const handleDeleteComment = (commentId) => {
+        const token = localStorage.getItem("token")
+        const socket = new SockJS(`${window.location.origin.replace('3000', '2208')}/ws?token=${token}`)
+        const client = Stomp.over(socket)
+        client.connect({}, () => {
+            client.send(`/app/comments/delete/${commentId}`, {}, "")
+            setTimeout(() => client.disconnect(), 500)
+        })
+    }
+
+    const handleEditComment = (commentId, newContent) => {
+        const token = localStorage.getItem("token");
+        const socket = new SockJS(`${window.location.origin.replace('3000', '2208')}/ws?token=${token}`);
+        const client = Stomp.over(socket);
+        client.connect({}, () => {
+            client.send(`/app/comments/update/${postId}`, {}, JSON.stringify({ id: commentId, content: newContent }));
+            setTimeout(() => client.disconnect(), 500);
+        });
+    };
 
     return (
         <div>
-
             <Modal isOpen={isOpen} onClose={onClose} size={"4xl"}>
                 <ModalOverlay />
                 <ModalContent>
@@ -32,9 +77,9 @@ const CommentModal = ({ onClose, isOpen, isSaved, isPostLiked, handleClickLike, 
                                     <BsThreeDots />
                                 </div>
                                 <hr />
-                                <div className="comment">
-                                    {[1, 2, 3, 4].map((item) => (
-                                        <CommentCard />
+                                <div className="comment overflow-scroll">
+                                    {commentTree.length > 0 && commentTree.filter(item => !item.isDeleted).map((item) => (
+                                        <CommentCard key={item.id} comment={item} onReply={handleReply} onDelete={handleDeleteComment} onEdit={handleEditComment} currentUserId={user?.id} postOwnerId={postOwnerId} />
                                     ))}
                                 </div>
                                 <div className="absolute bottom-0 w-[90%]">
@@ -57,8 +102,9 @@ const CommentModal = ({ onClose, isOpen, isSaved, isPostLiked, handleClickLike, 
                                     <div>
                                         <div className="w-full flex items-center" >
                                             <BsEmojiSmile />
-                                            <input type="text" className="commentInput w-full text-left" placeholder="Add a comment..." />
+                                            <input value={commentText} onChange={(e)=>setCommentText(e.target.value)} type="text" className="commentInput w-full text-left" placeholder="Add a comment..." />
                                         </div>
+                                        <Button onClick={handleSendComment}>Gửi </Button>
                                     </div>
                                 </div>
                             </div>

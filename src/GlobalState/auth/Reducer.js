@@ -1,4 +1,4 @@
-import { LOGIN_FAILURE, LOGIN_REQUEST, LOGIN_SUCCESS } from "./ActionType"
+import { GET_USER, GET_USER_FAILURE, GET_USER_SUCCESS, LOGIN_FAILURE, LOGIN_REQUEST, LOGIN_SUCCESS, UPDATE_USER, UPDATE_USER_SUCCESS } from "./ActionType"
 
 const initialState = {
     user: null,
@@ -10,6 +10,8 @@ const initialState = {
 export const AuthReducer = (state = initialState, action) => {
     switch (action.type) {
         case LOGIN_REQUEST:
+        case GET_USER:
+        case UPDATE_USER:
             return {
                 ...state,
                 isLoading: true,
@@ -18,12 +20,17 @@ export const AuthReducer = (state = initialState, action) => {
                 user: null
             }
         case LOGIN_SUCCESS:
+        case GET_USER_SUCCESS:
+        case UPDATE_USER_SUCCESS:
             return {
                 ...state,
                 isLoading: false,
                 user: action.payload,
             }
         case LOGIN_FAILURE:
+        case GET_USER_FAILURE:
+
+
             return {
                 ...initialState,
                 error: action.payload
