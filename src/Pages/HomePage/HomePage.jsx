@@ -6,6 +6,7 @@ import StoryCircle from '../../Components/StoryCircle/StoryCircle'
 import axiosInstance from '../../AppConfig/axiosConfig'
 import { useDispatch } from 'react-redux'
 import { getAllReaction } from '../../GlobalState/reaction/action'
+import { useNavigate } from 'react-router-dom'
 const HomePage = () => {
 
     const [data, setData] = useState([])
@@ -13,6 +14,7 @@ const HomePage = () => {
      const dispatch = useDispatch()
     
     useEffect(()=>{
+        
         dispatch(getAllReaction())
     }, [])
 
@@ -24,9 +26,7 @@ const HomePage = () => {
     const getAllPost = async () => {
         try {
             const response = await axiosInstance.get(`api/post?id=${2}`)
-          
-            
-            setData(response.data)                        
+            setData(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
 
         }
@@ -34,27 +34,17 @@ const HomePage = () => {
 
     return (
         <div>
-            <div className='mt-10 flex w-[100%] justify-center'>
-                <div className='w-[50%] px-10'>
-                    <div className='storyDiv flex space-x-5 border p-4 rounded-sm justify-start w-full'>
-                        {
-                            [1, 2, 3, 4, 5].map((item) => (
-                                <StoryCircle key={item}/>
-                            ))
-                        }
-                    </div>
-                    
-                    <div className='space-y-10 w-full mt-10 px-3'>
-                        {
-                            data.length > 0 && data.map((item) => (
-                                <div  key={item.id}>
-                                    <PostCard post={item} />
-                                </div>
-                            ))
-                        }
+            <div className='mt-10 flex flex-col lg:flex-row w-full justify-center '>
+                <div className='w-full lg:w-[50%] px-2 lg:px-10'>
+                    <div className='space-y-10 w-full mt-10 px-3 '>
+                        {(Array.isArray(data) ? data : []).map((item) => (
+                            <div  key={item.id}>
+                                <PostCard post={item} />
+                            </div>
+                        ))}
                     </div>
                 </div>
-                <div className='w-[35%] sticky top-10 h-fit'>
+                <div className='w-full lg:w-[35%] sticky top-10 h-fit hidden lg:block'>
                     <HomeRight />
                 </div>
             </div>

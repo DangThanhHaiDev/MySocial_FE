@@ -1,6 +1,6 @@
-import React from "react";
 
 const NormalMessage = ({ message }) => {
+  
   const { senderName, lastMessage, timestamp, avatarUrl, isOnline } = message;
   return (
     <div className="flex items-center space-x-3 p-3 hover:bg-gray-100 cursor-pointer rounded-lg w-[3000px]">
@@ -26,7 +26,7 @@ const NormalMessage = ({ message }) => {
           </span>
         </div>
         <p className="text-sm text-gray-500 truncate mt-1 text-left">
-          {lastMessage || "Cảm ơn bạn nhiều nhé"}
+          {message.deleted ? "Tin nhắn đã được thu hồi" : lastMessage}
         </p>
       </div>
     </div>

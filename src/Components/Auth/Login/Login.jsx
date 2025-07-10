@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { FiMail, FiLock } from "react-icons/fi";
-import axiosInstance from "../../../AppConfig/axiosConfig";
-import { useNavigate } from "react-router-dom";
+
 import { useDispatch, useSelector } from "react-redux";
 import { login } from "../../../GlobalState/auth/Action";
 import logo from "../../../Resource/images/logo.jpg";
@@ -12,11 +11,10 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [err, setErr]= useState("")
     const dispatch = useDispatch()
-    const navigate = useNavigate()
     const {error, user} = useSelector(state => state.auth)
     
     useEffect(()=>{
-       if(error){
+       if(error && error!=="Access Denied"){
         setErr(error)
        }
     }, [error])
@@ -70,7 +68,7 @@ const Login = () => {
                     </div>
                     {
                         err && 
-                        <p className="text-red-400 text-center font-semibold bg-white/20 rounded-lg py-2 px-3 animate-pulse shadow-md">{err}</p>
+                        <p className="text-red-400 text-center font-semibold bg-white/20 rounded-lg py-2 px-3 shadow-md">Tên đăng nhập hoặc mật khẩu không đúng</p>
                     }
                     <button
                         type="submit"

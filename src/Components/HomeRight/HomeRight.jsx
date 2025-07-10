@@ -17,9 +17,10 @@ const HomeRight = () => {
         setError("");
         try {
             const res = await axiosInstance.get("/api/friends/suggest");
-            setSuggestions(res.data);
+            setSuggestions(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             setError("Không thể tải danh sách gợi ý kết bạn");
+            setSuggestions([]);
         } finally {
             setLoading(false);
         }
@@ -53,13 +54,13 @@ const HomeRight = () => {
                     <div className="space-y-5 mt-5">
                         {loading && <p>Đang tải...</p>}
                         {error && <p className="text-red-500 text-xs">{error}</p>}
-                        {suggestions.map((user) => (
-                            <div key={user.id} className="flex items-center justify-between p-2 bg-white rounded shadow" >
+                        {(Array.isArray(suggestions) ? suggestions : []).map((user) => (
+                            <div key={user?.id} className="flex items-center justify-between p-2 bg-white rounded shadow" >
                                 <div className="flex items-center gap-3">
-                                    <img className="h-10 w-10 rounded-full object-cover cursor-pointer" src={user.avatarUrl || "/default-image.jpg"} alt="avatar"onClick={()=>navigate(`/profile/${user.id}`)} />
+                                    <img className="h-10 w-10 rounded-full object-cover cursor-pointer" src={user?.avatarUrl || "/default-image.jpg"} alt="avatar"onClick={()=>navigate(`/profile/${user.id}`)} />
                                     <div>
-                                        <p className="font-semibold text-sm">{user.firstName} {user.lastName}</p>
-                                        <p className="text-xs text-gray-500">{user.email}</p>
+                                        <p className="font-semibold text-sm">{user?.firstName} {user?.lastName}</p>
+                                        <p className="text-xs text-gray-500">{user?.email}</p>
                                     </div>
                                 </div>
                                 <button

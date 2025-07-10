@@ -10,6 +10,8 @@ import { useDispatch, useSelector } from "react-redux"
 import { changeTheme } from "../../GlobalState/theme/Action"
 import ProfilePage from "../../Components/ProfileAnother/ProfileAnother"
 import FriendsListPage from "../../Components/FriendShip/FriendList"
+import Notification from "../../Components/Notification/Notification"
+import BottomNavBar from "../../Components/Slidebar/BottomNavBar"
 
 //Private route tưc là route đã đã nhập
 const Router = () => {
@@ -26,7 +28,7 @@ const Router = () => {
         <div>
 
             <div className="flex ">
-                <div className="w-[20%] shadow-md pl-10 h-[100vh]">
+                <div className="w-0 lg:w-[20%] shadow-md pl-0 lg:pl-10 h-[100vh]">
                     <Slidebar />
                 </div>
 
@@ -39,11 +41,11 @@ const Router = () => {
                         <Route path="/friendship" element={<FriendShip />}></Route>
                         <Route path="/profile/:userId" element={<ProfilePage />}></Route>
                         <Route path="/friend-list/:userId" element={<FriendsListPage />}></Route>
-
+                        <Route path="/notification" element={<Notification />}></Route>
                     </Routes>
                 </div>
             </div>
-
+            <BottomNavBar />
         </div>
     )
 }

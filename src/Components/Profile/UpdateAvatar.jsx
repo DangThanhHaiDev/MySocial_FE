@@ -1,30 +1,35 @@
 import { useState } from "react";
-import { 
-  X, 
-  ImageIcon, 
-  Video, 
-  MapPin, 
-  Users, 
+import {
+  X,
+  ImageIcon,
+  Video,
+  Smile,
+  MapPin,
+  Users,
   UserCheck,
   ChevronDown,
   Upload,
   UserLock
 } from "lucide-react";
+import axiosInstance from "../../AppConfig/axiosConfig";
 import axios from "axios";
 import url from "../../AppConfig/urlApp";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { getUserByJwt } from "../../GlobalState/auth/Action";
 
-
-const CreatePostModal = ({ onClose, isOpen }) => {
+const UpdateAvatarModal = ({ onClose, isOpen }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [file, setFile] = useState(null);
   const [caption, setCaption] = useState("");
-  const [location, setLocation] = useState("");
   const [privacy, setPrivacy] = useState("PUBLIC");
   const [showPrivacyDropdown, setShowPrivacyDropdown] = useState(false);
   const user = useSelector(state => state.auth.user)
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
 
- 
+
+
 
   const privacyOptions = [
     {
@@ -62,10 +67,10 @@ const CreatePostModal = ({ onClose, isOpen }) => {
     setIsDragOver(false);
     const droppedFile = event.dataTransfer.files[0];
     const extension = droppedFile.type;
-    if (extension.startsWith("image/") || extension.startsWith("video/")) {
+    if (extension.startsWith("image/")) {
       setFile(droppedFile);
     } else {
-      alert("Vui lòng chọn hình ảnh hoặc video");
+      alert("Vui lòng chọn hình ảnh");
     }
   };
 
@@ -74,11 +79,11 @@ const CreatePostModal = ({ onClose, isOpen }) => {
     const fileSelected = event.target.files[0];
     if (fileSelected) {
       const extension = fileSelected.type;
-      if (extension.startsWith("image/") || extension.startsWith("video/")) {
+      if (extension.startsWith("image/") ) {
         setFile(fileSelected);
       } else {
         setFile(null);
-        alert("Vui lòng chọn hình ảnh hoặc video");
+        alert("Vui lòng chọn hình ảnh");
       }
     }
   };
@@ -86,9 +91,8 @@ const CreatePostModal = ({ onClose, isOpen }) => {
   const handleCaptionChange = (event) => {
     setCaption(event.target.value);
   };
-  const handleReset = ()=>{
+  const handleReset = () => {
     setCaption("")
-    setLocation("")
     setFile(null)
   }
 
@@ -96,20 +100,17 @@ const CreatePostModal = ({ onClose, isOpen }) => {
     e.preventDefault();
     const formData = new FormData();
     formData.append("caption", caption);
-    formData.append("location", location);
-    formData.append("privacy", privacy);
     formData.append("file", file);
-
-   
-    
+    formData.append("privacy", privacy)
 
     try {
-     const response = await axios.post(`${url}/api/post`, formData, {
-        headers:{
-            "Authorization": "Bearer "+localStorage.getItem("token")
+      const response = await axios.post(`${url}/api/users/avatar`, formData, {
+        headers: {
+          "Authorization": "Bearer " + localStorage.getItem("token")
         }
-     })
-      alert("Đã đăng bài viết thành công!");
+      })
+      dispatch(getUserByJwt(navigate))
+      alert("Đã cập nhật ảnh đại diện thành công!");
       onClose();
       handleReset()
     } catch (error) {
@@ -131,7 +132,7 @@ const CreatePostModal = ({ onClose, isOpen }) => {
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800">Tạo bài viết mới</h2>
+            <h2 className="text-xl font-bold text-gray-800">Cập nhật ảnh đại diện</h2>
             <div className="flex items-center gap-3">
               <button
                 type="submit"
@@ -183,11 +184,10 @@ const CreatePostModal = ({ onClose, isOpen }) => {
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
-                  className={`h-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all duration-300 ${
-                    isDragOver
+                  className={`h-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all duration-300 ${isDragOver
                       ? "border-blue-500 bg-blue-50"
                       : "border-gray-300 hover:border-gray-400"
-                  }`}
+                    }`}
                 >
                   <div className="flex flex-col items-center text-center space-y-4">
                     <div className="p-4 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full">
@@ -201,7 +201,7 @@ const CreatePostModal = ({ onClose, isOpen }) => {
                         Kéo ảnh hoặc video vào đây
                       </p>
                       <p className="text-gray-500 text-sm">
-                        Hỗ trợ định dạng JPG, PNG, MP4, MOV
+                        Hỗ trợ định dạng JPG, PNG
                       </p>
                     </div>
                     <div className="pt-4">
@@ -237,13 +237,13 @@ const CreatePostModal = ({ onClose, isOpen }) => {
                     <img
                       className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-200"
                       src={user.avatarUrl}
-                      alt={user.firstName +" "+ user.lastName}
+                      alt={user.firstName + " " + user.lastName}
                     />
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
                   </div>
                   <div>
                     <p className="font-bold text-gray-800">{user.firstName}</p>
-                    <p className="text-sm text-gray-500">{user.firstName +" "+ user.lastName}</p>
+                    <p className="text-sm text-gray-500">{user.firstName + " " + user.lastName}</p>
                   </div>
                 </div>
               </div>
@@ -260,27 +260,14 @@ const CreatePostModal = ({ onClose, isOpen }) => {
                     maxLength={2200}
                   />
                   <div className="flex justify-between items-center mt-2 px-2">
-                   
+
                     <span className={`text-sm ${caption.length > 2000 ? 'text-red-500' : 'text-gray-500'}`}>
                       {caption.length}/2,200
                     </span>
                   </div>
                 </div>
 
-                {/* Location */}
-                <div className="mb-4">
-                  <div className="relative">
-                    <input
-                      className="w-full p-4 pl-12 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      type="text"
-                      placeholder="Thêm vị trí"
-                      name="location"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                    />
-                    <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  </div>
-                </div>
+
 
                 {/* Privacy Settings */}
                 <div className="mb-4">
@@ -309,7 +296,7 @@ const CreatePostModal = ({ onClose, isOpen }) => {
                       </div>
                       <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${showPrivacyDropdown ? 'rotate-180' : ''}`} />
                     </button>
-                    
+
                     {showPrivacyDropdown && (
                       <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
                         {privacyOptions.map((option) => (
@@ -320,9 +307,8 @@ const CreatePostModal = ({ onClose, isOpen }) => {
                               setPrivacy(option.value);
                               setShowPrivacyDropdown(false);
                             }}
-                            className={`w-full p-4 flex items-center text-left hover:bg-gray-50 transition-colors duration-200 first:rounded-t-xl last:rounded-b-xl ${
-                              privacy === option.value ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                            }`}
+                            className={`w-full p-4 flex items-center text-left hover:bg-gray-50 transition-colors duration-200 first:rounded-t-xl last:rounded-b-xl ${privacy === option.value ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                              }`}
                           >
                             <option.icon className="w-5 h-5 text-gray-600 mr-3" />
                             <div>
@@ -344,4 +330,4 @@ const CreatePostModal = ({ onClose, isOpen }) => {
   );
 };
 
-export default CreatePostModal;
+export default UpdateAvatarModal;

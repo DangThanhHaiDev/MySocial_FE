@@ -115,7 +115,6 @@ const FriendShip = () => {
           onClick={() => setTab("requests")}
         >
           <FaUserPlus /> Lời mời kết bạn
-          <span className="ml-2 bg-blue-100 text-blue-700 rounded-full px-2 text-xs">{requests.length}</span>
         </button>
 
         <button
@@ -123,7 +122,6 @@ const FriendShip = () => {
           onClick={() => setTab("friends")}
         >
           <FaUserFriends /> Bạn bè
-          <span className="ml-2 bg-blue-100 text-blue-700 rounded-full px-2 text-xs">{friends.length}</span>
         </button>
         <button
           className={`px-4 py-2 rounded font-semibold flex items-center gap-2 shadow ${tab === "suggestion" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
@@ -187,7 +185,6 @@ const FriendShip = () => {
                 </div>
                 <div className="ml-auto flex gap-2">
                   <button title="Xem profile" onClick={() => handleViewProfile(friend.id)} className="bg-gray-100 hover:bg-blue-100 text-blue-600 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"><FaUser /> Profile</button>
-                  <button title="Nhắn tin" onClick={() => handleChat(friend.id)} className="bg-gray-100 hover:bg-green-100 text-green-600 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"><FaCommentDots /> Nhắn tin</button>
                   <button title="Hủy kết bạn" onClick={() => handleUnfriend(friend.id)} className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"><FaTrash /> Hủy</button>
                 </div>
               </div>

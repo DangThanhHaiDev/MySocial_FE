@@ -1,4 +1,3 @@
-import React from "react";
 
 const FriendList = ({ friends, friendSearch, setFriendSearch, selectedUser, setSelectedUser, loadingFriends }) => (
   <div className="p-4 border-b bg-gray-50">

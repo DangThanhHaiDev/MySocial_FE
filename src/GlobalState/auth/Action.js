@@ -42,10 +42,14 @@ export const updateUser = (request) => async (dispatch) => {
         const response = await axiosInstance.put("/api/users", request)
         const { data } = response
         localStorage.setItem("user", JSON.stringify(data))
-        console.log("Dduocj hucaw ");
         
         dispatch({ type: UPDATE_USER_SUCCESS, payload: data })
     } catch (error) {
         dispatch({ type: UPDATE_USER_FAILURE, payload: error.response.data.message })
     }
+}
+
+export const logout = ()=>(dispatch)=>{
+    dispatch({type:"LOGOUT"})
+    
 }

@@ -287,17 +287,17 @@ const UpdateModal = ({ isOpen, onClose, user, onSave, editType = 'profile' }) =>
     const modalConfig = getModalConfig();
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[100vh] overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-white rounded-3xl w-full max-w-full sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[100vh] overflow-hidden shadow-2xl flex flex-col">
                 {/* Header với gradient */}
-                <div className={`bg-gradient-to-r ${modalConfig.gradient} px-8 py-6 text-white relative overflow-hidden`}>
+                <div className={`bg-gradient-to-r ${modalConfig.gradient} px-4 sm:px-8 py-4 sm:py-6 text-white relative overflow-hidden`}>
                     <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
                     <div className="relative flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-white/20 rounded-xl">
                                 {modalConfig.icon}
                             </div>
-                            <h2 className="text-xl font-bold">
+                            <h2 className="text-lg sm:text-xl font-bold">
                                 {modalConfig.title}
                             </h2>
                         </div>
@@ -312,45 +312,43 @@ const UpdateModal = ({ isOpen, onClose, user, onSave, editType = 'profile' }) =>
 
                 {/* Content */}
                 <div className="max-h-[calc(95vh-140px)] overflow-y-auto">
-                    <div className="p-8">
+                    <div className="p-4 sm:p-8">
                         {/* Thông tin không thể sửa - chỉ hiển thị với profile */}
                         {editType === 'profile' && (
-                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-2xl p-6 mb-8 border border-slate-200">
-                                <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 border border-slate-200">
+                                <h3 className="text-xs sm:text-sm font-bold text-slate-700 mb-2 sm:mb-4 flex items-center gap-2">
                                     <div className="p-1.5 bg-slate-200 rounded-lg">
                                         <Shield className="w-4 h-4 text-slate-600" />
                                     </div>
                                     Thông tin cố định
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                                    <div className="flex items-center gap-3 p-2 sm:p-3 bg-white rounded-xl border border-slate-200">
                                         <Hash className="w-4 h-4 text-slate-400" />
                                         <div>
                                             <span className="text-xs text-slate-500 block">ID</span>
                                             <span className="font-semibold text-slate-700">#{user?.id}</span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200">
+                                    <div className="flex items-center gap-3 p-2 sm:p-3 bg-white rounded-xl border border-slate-200">
                                         <Mail className="w-4 h-4 text-slate-400" />
                                         <div>
                                             <span className="text-xs text-slate-500 block">Email</span>
                                             <span className="font-semibold text-slate-700">{user?.email}</span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200">
+                                    <div className="flex items-center gap-3 p-2 sm:p-3 bg-white rounded-xl border border-slate-200">
                                         <Phone className="w-4 h-4 text-slate-400" />
                                         <div>
                                             <span className="text-xs text-slate-500 block">Số điện thoại</span>
                                             <span className="font-semibold text-slate-700">{user?.phone}</span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200">
+                                    <div className="flex items-center gap-3 p-2 sm:p-3 bg-white rounded-xl border border-slate-200">
                                         <Shield className="w-4 h-4 text-slate-400" />
                                         <div>
                                             <span className="text-xs text-slate-500 block">Vai trò</span>
-                                            <span className={`font-semibold px-2 py-1 rounded-lg text-xs ${user?.role === 'ADMIN' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                {user?.role === 'ADMIN' ? 'Quản trị viên' : 'Người dùng'}
-                                            </span>
+                                            <span className={`font-semibold px-2 py-1 rounded-lg text-xs ${user?.role === 'ADMIN' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{user?.role === 'ADMIN' ? 'Quản trị viên' : 'Người dùng'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -363,19 +361,19 @@ const UpdateModal = ({ isOpen, onClose, user, onSave, editType = 'profile' }) =>
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="border-t border-slate-200 p-6 bg-slate-50">
-                    <div className="flex justify-end gap-4">
+                <div className="border-t border-slate-200 p-4 sm:p-6 bg-slate-50">
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-8 py-3 text-slate-700 bg-white border-2 border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 font-semibold"
+                            className="w-full sm:w-auto px-6 sm:px-8 py-3 text-slate-700 bg-white border-2 border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 font-semibold"
                         >
                             Hủy bỏ
                         </button>
                         <button
                             type="button"
                             onClick={handleSubmit}
-                            className={`px-8 py-3 bg-gradient-to-r ${modalConfig.gradient} text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 font-semibold flex items-center gap-2`}
+                            className={`w-full sm:w-auto px-6 sm:px-8 py-3 bg-gradient-to-r ${modalConfig.gradient} text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 font-semibold flex items-center gap-2`}
                         >
                             <Save className="w-4 h-4" />
                             Lưu thay đổi
