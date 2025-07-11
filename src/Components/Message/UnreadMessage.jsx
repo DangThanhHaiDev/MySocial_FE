@@ -1,4 +1,3 @@
-import React from "react";
 
 const UnreadMessage = ({ message }) => {
   const { senderName, lastMessage, timestamp, avatarUrl, unreadCount, isOnline } = message;

@@ -12,8 +12,6 @@ import Group from "./Group";
 
 
 
-
-
 const Message = () => {
   const [conversations, setConversations] = useState([]);
   // Friend list state
@@ -25,16 +23,19 @@ const Message = () => {
   const stompClient = useRef(null);
   const [title, setTitle] = useState("don")
   useEffect(() => {
-    if (title === "nhom") return
-    if (stompClient.current?.connected) {
-      stompClient.current.disconnect(() => {
-        console.log("❌ Disconnected (out of screen)");
-      });
-    }
-
-
     const token = localStorage.getItem("token");
     if (!token) return;
+
+    // Nếu là nhóm thì disconnect WebSocket nếu đang kết nối
+    if (title === "nhom") {
+      if (stompClient.current?.connected) {
+        stompClient.current.disconnect(() => {
+          console.log("❌ Disconnected because title is 'nhom'");
+        });
+      }
+      return; // Ngừng luôn, không kết nối nữa
+    }
+
     if (stompClient.current?.connected) return;
 
     stompClient.current = Stomp.over(() => new SockJS(`${url}/ws?token=${token}`));
@@ -58,7 +59,8 @@ const Message = () => {
         });
       }
     };
-  }, [currentUser]);
+  }, [currentUser]); 
+
   // Lấy user hiện tại
   useEffect(() => {
     const fetchMe = async () => {
@@ -75,7 +77,6 @@ const Message = () => {
   }, []);
 
 
-  // Hàm reload hội thoại
   const reloadConversations = async () => {
     try {
       console.log("🔄 Reloading conversations...");
@@ -123,7 +124,7 @@ const Message = () => {
     isOnline: c.isOnline
   }));
 
-  
+
 
   const normalMessages = conversations.filter(
     c => !c.isGroup && (!c.unreadCount || c.unreadCount === 0)
@@ -165,30 +166,29 @@ const Message = () => {
       </div>
       {
         title === "don" ?
-        <div>
-          {selectedUser && currentUser ? (
-            <ChatBox user={selectedUser} onClose={handleCloseChat} currentUser={currentUser} onNewMessage={reloadConversations} />
-          ) : (
-            <>
-              <FriendList
-                friends={friends}
-                friendSearch={friendSearch}
-                setFriendSearch={setFriendSearch}
-                selectedUser={selectedUser}
-                setSelectedUser={setSelectedUser}
-                loadingFriends={loadingFriends}
-              />
-              hihihi
-              <ConversationList
-                unreadMessages={unreadMessages}
-                normalMessages={normalMessages}
-                onSelectUser={handleSelectUserFromConversation}
-              />
-            </>
-          )}
-        </div>
-        :
-        <Group />
+          <div>
+            {selectedUser && currentUser ? (
+              <ChatBox user={selectedUser} onClose={handleCloseChat} currentUser={currentUser} onNewMessage={reloadConversations} />
+            ) : (
+              <>
+                <FriendList
+                  friends={friends}
+                  friendSearch={friendSearch}
+                  setFriendSearch={setFriendSearch}
+                  selectedUser={selectedUser}
+                  setSelectedUser={setSelectedUser}
+                  loadingFriends={loadingFriends}
+                />
+                <ConversationList
+                  unreadMessages={unreadMessages}
+                  normalMessages={normalMessages}
+                  onSelectUser={handleSelectUserFromConversation}
+                />
+              </>
+            )}
+          </div>
+          :
+          <Group currentUser={currentUser} />
       }
 
     </div>

@@ -560,8 +560,8 @@ const ChatBox = ({ user, onClose, currentUser }) => {
 
           <button
             className={`p-2 rounded-full transition-colors ${input.trim() || file
-                ? "bg-blue-500 text-white hover:bg-blue-600"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-blue-500 text-white hover:bg-blue-600"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
             onClick={sendMessage}
             disabled={!input.trim() && !file}

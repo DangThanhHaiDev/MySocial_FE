@@ -14,7 +14,7 @@ import CommentModal from "../Comment/CommentModal";
 import { useDisclosure } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import url from "../../AppConfig/urlApp";
-import "./postcard.scss"; // giữ file cũ để bạn tuỳ chỉnh tiếp
+import "./postcard.scss";
 import { useDispatch, useSelector } from "react-redux";
 import SockJS from "sockjs-client";
 import { Stomp } from "@stomp/stompjs";
@@ -29,27 +29,25 @@ import { getUserByJwt } from "../../GlobalState/auth/Action";
 
 const PostCard = ({ post }) => {
   const [showDropDown, setShowDropDown] = useState(false);
-  // const { isOpen, onOpen, onClose } = useDisclosure();
   const [showReactions, setShowReactions] = useState(false);
   const safeComments = Array.isArray(post.comments) ? post.comments : [];
   const [comment, setComment] = useState(safeComments);
   const [reactionCount, setReactionCount] = useState(post.reactionCount || 0);
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [commentTreeReloadKey, setCommentTreeReloadKey] = useState(0);
-  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [showFullContent, setShowFullContent] = useState(false);
+  
+  const navigate = useNavigate()
   const dispatch = useDispatch()
-
-  const onOpen = () => {
-    setIsOpen(true)
-  }
-  const onClose = () => {
-    setIsOpen(false)
-  }
   const stompClient = useRef(null);
   const user = useSelector(state => state.auth.user)
   const [isPostLiked, setIsPostLiked] = useState(post.currentUserReactionType || null);
   const [ref, isVisible] = useOnScreen({ threshold: 0.1 });
+
+  const onOpen = () => setIsOpen(true)
+  const onClose = () => setIsOpen(false)
 
   // Reaction cố định
   const fixedReactions = [
@@ -65,14 +63,97 @@ const PostCard = ({ post }) => {
     try {
       const response = await axiosInstance.delete(`/api/post/${post.id}`)
       const { data } = response
-      console.log(data);
-      alert("đã xóa thành công")
+      alert("Đã xóa thành công")
       setIsModalOpen(false)
       dispatch(getUserByJwt(navigate))
     } catch (error) {
-      alert("Vui long thử lại sau")
+      console.error('Error deleting post:', error)
+      alert("Vui lòng thử lại sau")
     }
   }
+
+  const handleNav = (userId) => {
+    if (user.id === userId) {
+      navigate('/username')
+    } else {
+      navigate(`/profile/${userId}`)
+    }
+  }
+
+  const handleReaction = (reactionType) => {
+    if (stompClient.current && stompClient.current.connected) {
+      let action = 'add';
+      // Nếu user click lại đúng cảm xúc hiện tại thì remove
+      if (isPostLiked === reactionType) {
+        action = 'remove';
+      }
+      const request = {
+        action,
+        reactionType: reactionType
+      };
+      stompClient.current.send(`/app/reactions/${post.id}`, {}, JSON.stringify(request));
+    } else {
+      console.warn("⚠️ WebSocket chưa kết nối");
+    }
+  };
+
+  const sendComment = (commentText, parentId = null) => {
+    if (stompClient.current && stompClient.current.connected) {
+      const request = { content: commentText };
+      if (parentId) request.parentId = parentId;
+      stompClient.current.send(`/app/comments/${post.id}`, {}, JSON.stringify(request));
+      setCommentTreeReloadKey(prev => prev + 1);
+    } else {
+      console.warn("⚠️ WebSocket chưa kết nối");
+    }
+  };
+
+  const handleClickDropDown = () => setShowDropDown(!showDropDown);
+  
+  const handleClickLike = () => {
+    if (isPostLiked) {
+      setIsPostLiked(null)
+      return
+    }
+    setIsPostLiked(!isPostLiked);
+  }
+  
+  const handleOpenCommentModal = () => {
+    onOpen()
+  };
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return 'vừa xong';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút trước`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày trước`;
+    
+    return date.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+  };
+
+  const getPrivacyIcon = (privacy) => {
+    switch (privacy) {
+      case "FRIENDS":
+        return <UserCheck size={12} className="inline ml-1" />;
+      case "PRIVATE":
+        return <UserLock size={12} className="inline ml-1" />;
+      default:
+        return <Globe size={12} className="inline ml-1" />;
+    }
+  };
+
+  const truncateContent = (content, maxLength = 200) => {
+    if (!content || content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + '...';
+  };
 
   useEffect(() => {
     setIsPostLiked(post.currentUserReactionType || null);
@@ -83,62 +164,34 @@ const PostCard = ({ post }) => {
     if (!isVisible) {
       if (stompClient.current?.connected) {
         stompClient.current.disconnect(() => {
-          console.log("❌ Disconnected (out of screen)");
+          // console.log("❌ Disconnected (out of screen)");
         });
       }
       return;
     }
 
     const token = localStorage.getItem("token");
-    console.log("Token for WS:", token);
     if (!token) return;
     if (stompClient.current?.connected) return;
 
     stompClient.current = Stomp.over(() => new SockJS(`${url}/ws?token=${token}`));
-    stompClient.current.reconnect_delay = 5000; // tùy chọn: auto reconnect
+    stompClient.current.reconnect_delay = 5000;
 
     stompClient.current.connect({}, () => {
-      // console.log("✅ WebSocket connected");
-
-      // stompClient.current.subscribe(`/topic/comments/${post.id}`, (message) => {
-      //   const body = JSON.parse(message.body);
-
-
-      //   if (body.action === "delete" && body.commentId) {
-      //     setComment(prev => prev.filter(c => c.id !== body.commentId));
-      //   } else if (body.action === "update" && body.commentId && body.data) {
-      //     setComment(prev => prev.map(c => c.id === body.commentId ? { ...c, ...body.data } : c));
-      //   } else if (body.data) {
-      //     setComment(prev => [...prev, body.data]);
-      //   }
-      // });
-      // In your PostCard component, update the comment subscription handler:
-
       stompClient.current.subscribe(`/topic/comments/${post.id}`, (message) => {
         const body = JSON.parse(message.body);
-        console.log("Received comment message:", body);
 
         if (body.action === "delete" && body.commentId) {
           setComment(prev => prev.filter(c => c.id !== body.commentId));
         } else if (body.action === "update" && body.commentId && body.data) {
           setComment(prev => prev.map(c => c.id === body.commentId ? { ...c, ...body.data } : c));
         } else if (body.data) {
-          if (body.data.parentId) {
-            console.log("Vào reply");
-
-            setComment(prev => [...prev, body.data]);
-
-          } else {
-            console.log("Vào else");
-
-            setComment(prev => [...prev, body.data]);
-          }
+          setComment(prev => [...prev, body.data]);
         }
       });
 
       stompClient.current.subscribe(`/topic/reactions/${post.id}`, (message) => {
         const body = JSON.parse(message.body);
-        console.log(body.action);
 
         if (body.action === "add" && body.data) {
           if (body.data.userId === user?.id) {
@@ -163,161 +216,156 @@ const PostCard = ({ post }) => {
     };
   }, [isVisible]);
 
-
-  const sendComment = (commentText, parentId = null) => {
-    if (stompClient.current && stompClient.current.connected) {
-      const request = { content: commentText };
-      if (parentId) request.parentId = parentId;
-      stompClient.current.send(`/app/comments/${post.id}`, {}, JSON.stringify(request));
-      setCommentTreeReloadKey(prev => prev + 1);
-    } else {
-      console.warn("⚠️ WebSocket chưa kết nối");
-    }
-  };
-
-  const handleClickDropDown = () => setShowDropDown(!showDropDown);
-  const handleClickLike = () => {
-    if (isPostLiked) {
-      setIsPostLiked(null)
-      return
-    }
-    setIsPostLiked(!isPostLiked);
-  }
-  const handleOpenCommentModal = () => {
-    onOpen()
-  };
-
-  const handleNav = (userId) => {
-    if (user.id == userId) {
-      navigate('/username')
-    }
-    else {
-      navigate(`/profile/${userId}`)
-    }
-  }
-
-  const handleReaction = (reactionType) => {
-    if (stompClient.current && stompClient.current.connected) {
-      let action = 'add';
-      // Nếu user click lại đúng cảm xúc hiện tại thì remove
-      if (isPostLiked === reactionType) {
-        action = 'remove';
-      }
-      const request = {
-        action,
-        reactionType: reactionType
-      };
-      console.log(request);
-
-      stompClient.current.send(`/app/reactions/${post.id}`, {}, JSON.stringify(request));
-    } else {
-      console.warn("⚠️ WebSocket chưa kết nối");
-    }
-  };
-
+  // Click outside để đóng dropdown
   useEffect(() => {
-    console.log(post);
+    const handleClickOutside = () => {
+      if (showDropDown) setShowDropDown(false);
+      if (showReactions) setShowReactions(false);
+    };
 
-  }, [])
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showDropDown, showReactions]);
 
   return (
-    <div ref={ref} className="max-w-xl mx-auto bg-white border rounded-xl shadow-md mb-8 overflow-hidden" onMouseLeave={() => setShowReactions(false)}>
+    <div 
+      ref={ref} 
+      className="max-w-xl mx-auto bg-white border rounded-xl shadow-md mb-8 overflow-hidden hover:shadow-lg transition-shadow duration-300"
+    >
       {/* Header */}
       <div className="flex justify-between items-center px-5 py-4">
-        <div className="flex items-center gap-3 hover:cursor-pointer">
+        <div className="flex items-center gap-3">
           <img
             src={post.user.avatarUrl ? url + post.user.avatarUrl : "https://i.pinimg.com/474x/27/5f/99/275f99923b080b18e7b474ed6155a17f.jpg?nii=t"}
             alt="avatar"
-            className="h-11 w-11 rounded-full object-cover border cursor-pointer"
+            className="h-11 w-11 rounded-full object-cover border cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => handleNav(post.user.id)}
           />
-          <div>
-            <p className="font-semibold text-sm text-left">{post.user.firstName + " " + post.user.lastName}</p>
-            <p className="text-xs text-gray-500 text-left">{post.location}</p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p 
+                className="font-semibold text-sm text-left cursor-pointer hover:underline"
+                onClick={() => handleNav(post.user.id)}
+              >
+                {post.user.firstName + " " + post.user.lastName}
+              </p>
+              {getPrivacyIcon(post.privacy)}
+            </div>
+            
+            {post.location && (
+              <p className="text-xs text-gray-500 text-left">{post.location}</p>
+            )}
+            
             <p className="text-xs text-gray-500 text-left">
-              {new Date(post.createdAt).toLocaleTimeString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false
-              })}{" "}
-              -{" "}
-              {new Date(post.createdAt).toLocaleDateString("vi-VN", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric"
-              })}
-              <span className="text-xs">
-                {post.privacy === "FRIENDS" ? (
-                  <UserCheck size={15} />
-                ) : post.privacy === "PRIVATE" ? (
-                  <UserLock size={15} />
-                ) : (
-                  <Globe size={15} /> 
-                )}
-              </span>
-
+              {formatTime(post.createdAt)}
             </p>
-            {post.avatar && (<p className="opacity-60 txt text-xs">{post.user.firstName + " " + post.user.lastName} đã cập nhật ảnh đại diện</p>)}
-
+            
+            {post.avatar && (
+              <p className="text-xs text-gray-600 italic">
+                {post.user.firstName + " " + post.user.lastName} đã cập nhật ảnh đại diện
+              </p>
+            )}
           </div>
         </div>
-        <div className="relative">
-          {
-            user?.id === post.user.id && (
-              <BsThreeDots className="cursor-pointer hover:opacity-60" onClick={handleClickDropDown} />
-            )
-          }
+        
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          {user?.id === post.user.id && (
+            <BsThreeDots 
+              className="cursor-pointer hover:opacity-60 p-1 rounded-full hover:bg-gray-100 transition-colors" 
+              size={20}
+              onClick={handleClickDropDown} 
+            />
+          )}
           {showDropDown && (
-            <div className="absolute right-0 mt-2 bg-black text-white text-sm rounded-md shadow px-4 py-2 z-10">
-              <p className="cursor-pointer hover:opacity-80" onClick={() => setIsModalOpen(true)}>Delete</p>
+            <div className="absolute right-0 mt-2 bg-white border rounded-lg shadow-lg px-3 py-2 z-10 min-w-[120px]">
+              <p 
+                className="cursor-pointer hover:bg-gray-100 p-2 rounded text-sm text-red-600 hover:text-red-700 transition-colors" 
+                onClick={() => {
+                  setIsModalOpen(true);
+                  setShowDropDown(false);
+                }}
+              >
+                Xóa bài viết
+              </p>
             </div>
           )}
-
         </div>
-
       </div>
 
-
       {/* Content */}
-      {post.content && <p className="px-5 text-sm text-left pb-3">{post.content}</p>}
-
+      {post.content && (
+        <div className="px-5 pb-3">
+          <p className="text-sm text-left leading-relaxed">
+            {showFullContent ? post.content : truncateContent(post.content)}
+          </p>
+          {post.content.length > 200 && (
+            <button
+              onClick={() => setShowFullContent(!showFullContent)}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-1"
+            >
+              {showFullContent ? 'Thu gọn' : 'Xem thêm'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Image */}
-      <div className="w-full">
-        {post.image && (
+      {post.image && (
+        <div className="w-full relative">
+          {isImageLoading && (
+            <div className="w-full h-64 bg-gray-200 animate-pulse flex items-center justify-center">
+              <div className="text-gray-400">Đang tải...</div>
+            </div>
+          )}
           <img
             src={url + post.image}
             alt="Post"
-            className="w-full object-cover cursor-pointer hover:opacity-95 transition"
+            className={`w-full object-cover cursor-pointer hover:opacity-95 transition-opacity ${isImageLoading ? 'hidden' : 'block'}`}
             onClick={() => window.open(url + post.image)}
+            onLoad={() => setIsImageLoading(false)}
+            onError={() => setIsImageLoading(false)}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Action buttons */}
       <div className="flex justify-between items-center px-5 py-3 relative">
-        <div className="relative group" onMouseEnter={() => setShowReactions(true)}>
-          <div className="flex items-center gap-3">
-            {isPostLiked && fixedReactions.find(r => r.type === isPostLiked) ? (
-              <span
-                className="text-2xl cursor-pointer hover:opacity-70 transition"
-                onClick={() => handleReaction(isPostLiked)}
-              >
-                {fixedReactions.find(r => r.type === isPostLiked).icon}
-              </span>
-            ) : (
-              <AiOutlineHeart className="text-xl cursor-pointer hover:opacity-70 transition" />
-            )}
-            <FaRegComment onClick={handleOpenCommentModal} className="text-xl cursor-pointer hover:opacity-70 transition" />
+        <div 
+          className="relative group" 
+          onMouseEnter={() => setShowReactions(true)}
+          onMouseLeave={() => setShowReactions(false)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              {isPostLiked && fixedReactions.find(r => r.type === isPostLiked) ? (
+                <span
+                  className="text-2xl cursor-pointer hover:scale-110 transition-transform"
+                  onClick={() => handleReaction(isPostLiked)}
+                >
+                  {fixedReactions.find(r => r.type === isPostLiked).icon}
+                </span>
+              ) : (
+                <AiOutlineHeart 
+                  className="text-2xl cursor-pointer hover:scale-110 transition-transform hover:text-red-500" 
+                  onClick={() => handleReaction('LIKE')}
+                />
+              )}
+            </div>
+            
+            <FaRegComment 
+              onClick={handleOpenCommentModal} 
+              className="text-xl cursor-pointer hover:scale-110 transition-transform hover:text-blue-500" 
+            />
           </div>
 
           {/* Reactions hover */}
           {showReactions && (
-            <div className="absolute top-8 left-0 flex gap-2 bg-white border px-2 py-1 rounded shadow z-20">
+            <div className="absolute bottom-full left-0 flex gap-1 bg-white border rounded-full px-3 py-2 shadow-lg z-20">
               {fixedReactions.map((reaction) => (
                 <span
                   key={reaction.type}
-                  className="text-2xl hover:scale-125 transition cursor-pointer"
+                  className="text-2xl hover:scale-125 transition-transform cursor-pointer p-1 rounded-full hover:bg-gray-100"
                   title={reaction.title}
                   onClick={() => {
                     handleReaction(reaction.type);
@@ -333,14 +381,22 @@ const PostCard = ({ post }) => {
       </div>
 
       {/* Likes & Comments */}
-      <div className="px-5 pb-3 text-sm text-left">
-        <p className="font-semibold">{reactionCount} cảm xúc</p>
-        <p className="text-gray-500 cursor-pointer hover:underline text-sm" onClick={handleOpenCommentModal}>
-          Xem tất cả {comment ? comment.length : 0} bình luận
-        </p>
+      <div className="px-5 pb-4 text-sm">
+        {reactionCount > 0 && (
+          <p className="font-semibold text-gray-700 mb-1">
+            {reactionCount} lượt thích
+          </p>
+        )}
+        
+        {comment && comment.length > 0 && (
+          <p 
+            className="text-gray-500 cursor-pointer hover:underline" 
+            onClick={handleOpenCommentModal}
+          >
+            Xem tất cả {comment.length} bình luận
+          </p>
+        )}
       </div>
-
-
 
       {/* Comment Modal */}
       <CommentModal
@@ -355,6 +411,7 @@ const PostCard = ({ post }) => {
         imageUrl={post.image}
         render={setComment}
       />
+      
       <ConfirmDeleteModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -367,4 +424,3 @@ const PostCard = ({ post }) => {
 };
 
 export default PostCard;
-

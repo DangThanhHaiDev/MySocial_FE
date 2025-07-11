@@ -11,7 +11,6 @@ const ConversationList = ({ unreadMessages, normalMessages, onSelectUser }) => (
         <UnreadMessage message={message} />
       </div>
     ))}
-    {/* Tin nhắn nhóm */}
     
     {/* Tin nhắn bình thường */}
     {normalMessages.map((message, index) => (

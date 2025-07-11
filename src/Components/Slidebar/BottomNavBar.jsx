@@ -54,7 +54,7 @@ const BottomNavBar = ({ onOpenCreate }) => {
           className={`flex-1 flex flex-col items-center py-1 ${item.isLogout ? 'text-red-600 hover:bg-red-50' : (activeTab === item.title ? 'text-blue-600' : 'text-gray-500')}`}
           onClick={() => handleTabClick(item)}
         >
-          <span className="text-2xl">{item.isLogout ? item.icon : (activeTab === item.title ? item.activeIcon : item.icon)}</span>
+          <span className="text-lg">{item.isLogout ? item.icon : (activeTab === item.title ? item.activeIcon : item.icon)}</span>
           <span className="text-xs mt-0.5">{item.title === 'Logout' ? 'Đăng xuất' : item.title}</span>
         </button>
       ))}
