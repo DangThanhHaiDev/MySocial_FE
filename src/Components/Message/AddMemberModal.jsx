@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, UserPlus, X, Check, Users, Sparkles, Crown, Shield, Star } from 'lucide-react';
 import axiosInstance from '../../AppConfig/axiosConfig';
 
-const AddMemberModal = ({ isOpen, onClose, onAddMembers, currentMembers = [] }) => {
+const AddMemberModal = ({ isOpen, onClose, onAddMembers, currentMembers = [] , groupId}) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUsers, setSelectedUsers] = useState([]);
     const [searchResults, setSearchResults] = useState([]);
@@ -11,11 +11,11 @@ const AddMemberModal = ({ isOpen, onClose, onAddMembers, currentMembers = [] }) 
 
     useEffect(() => {
         getFriends()
-    }, [])
+    }, [isOpen])
 
     const getFriends = async()=>{
         try {
-            const response = await axiosInstance.get(`/api/friends/list`)
+            const response = await axiosInstance.get(`/api/friends/group/friend/${groupId}`)
             setFriends(response.data)
             console.log(response.data);        
         } catch (error) {

@@ -11,18 +11,18 @@ import ReactionModal from "./ReactionModal";
 import AddMemberModal from "./AddMemberModal";
 import GroupMembersModal from "./MemberModal";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 const WS_URL = "http://localhost:2208/ws";
 
 
 const REACTIONS = [
-    { id: 2, type: 'LOVE', icon: <AiFillHeart className="text-red-500" />, title: 'Tim' },
-    { id: 3, type: 'HAHA', icon: <FaLaugh className="text-yellow-400" />, title: 'Haha' },
-    { id: 4, type: 'SAD', icon: <FaSadTear className="text-blue-400" />, title: 'Buồn' },
-    { id: 5, type: 'ANGRY', icon: <FaAngry className="text-red-700" />, title: 'Giận' },
-    { id: 6, type: 'WOW', icon: <FaSurprise className="text-yellow-400" />, title: 'Wow' },
-    { id: 7, type: 'LIKE', icon: <FaThumbsUp className="text-blue-500" />, title: 'Like' },
-    { id: 8, type: 'NONE', icon: <AiOutlineHeart />, title: 'Like' },
+    { id: 1, type: 'LOVE', icon: <AiFillHeart className="text-red-500" />, title: 'Tim' },
+    { id: 2, type: 'HAHA', icon: <FaLaugh className="text-yellow-400" />, title: 'Haha' },
+    { id: 3, type: 'SAD', icon: <FaSadTear className="text-blue-400" />, title: 'Buồn' },
+    { id: 4, type: 'ANGRY', icon: <FaAngry className="text-red-700" />, title: 'Giận' },
+    { id: 5, type: 'WOW', icon: <FaSurprise className="text-yellow-400" />, title: 'Wow' },
+    { id: 6, type: 'LIKE', icon: <FaThumbsUp className="text-blue-500" />, title: 'Like' },
+    { id: 7, type: 'NONE', icon: <AiOutlineHeart />, title: 'Like' },
 ];
 
 const ChatGroup = ({ user, onClose, group }) => {
@@ -91,36 +91,37 @@ const ChatGroup = ({ user, onClose, group }) => {
     }, []);
 
     const loadMoreMessages = useCallback(async () => {
-        if (loadingMore || !hasMore || !oldestMsgId) return;
-
+        if (loadingMore || !hasMore || !oldestMsgId || initialLoading) return;
         setLoadingMore(true);
         const currentScrollHeight = messagesBoxRef.current?.scrollHeight || 0;
-
         try {
             const res = await axiosInstance.get(
-                `/api/messages/history?userId=${user.id}&beforeMessageId=${oldestMsgId}&size=${PAGE_SIZE}`
+                `/api/messages/history/group?groupId=${group.id}&beforeMessageId=${oldestMsgId}&size=${PAGE_SIZE}`
             );
-
-            if (res.data.length > 0) {
-                setMessages(prev => [...res.data.reverse(), ...prev]);
-
-                // Maintain scroll position after loading more messages
-                requestAnimationFrame(() => {
-                    if (messagesBoxRef.current) {
-                        const newScrollHeight = messagesBoxRef.current.scrollHeight;
-                        const scrollDiff = newScrollHeight - currentScrollHeight;
-                        messagesBoxRef.current.scrollTop = scrollDiff;
-                    }
+            const paged = res.data;
+            if (paged.content.length > 0) {
+                setMessages(prev => {
+                    const newMessages = paged.content.slice().reverse();
+                    const existingIds = new Set(prev.map(msg => msg.id));
+                    const uniqueNewMessages = newMessages.filter(msg => !existingIds.has(msg.id));
+                    const result = [...uniqueNewMessages, ...prev];
+                    requestAnimationFrame(() => {
+                        if (messagesBoxRef.current) {
+                            const newScrollHeight = messagesBoxRef.current.scrollHeight;
+                            const scrollDiff = newScrollHeight - currentScrollHeight;
+                            messagesBoxRef.current.scrollTop = scrollDiff;
+                        }
+                    });
+                    return result;
                 });
             }
-
-            setHasMore(res.data.length === PAGE_SIZE);
+            setHasMore(paged.hasNext);
         } catch (error) {
             console.error("Error loading more messages:", error);
         } finally {
             setLoadingMore(false);
         }
-    }, [loadingMore, hasMore, oldestMsgId, user.id]);
+    }, [loadingMore, hasMore, oldestMsgId, group.id, initialLoading, messages.length]);
 
 
     const handleScroll = useCallback((e) => {
@@ -206,8 +207,10 @@ const ChatGroup = ({ user, onClose, group }) => {
         try {
             setInitialLoading(true);
             const res = await axiosInstance.get(`/api/messages/history/group?groupId=${group.id}&size=${PAGE_SIZE}`);
-            setMessages(res.data.reverse());
-            setHasMore(res.data.length === PAGE_SIZE);
+            const paged = res.data;
+            const msgs = paged.content.slice().reverse();
+            setMessages(msgs);
+            setHasMore(paged.hasNext);
             shouldScrollToBottomRef.current = true;
         } catch (e) {
             setMessages([]);
@@ -250,9 +253,8 @@ const ChatGroup = ({ user, onClose, group }) => {
 
         if (file) {
             const reader = new FileReader();
-            reader.onload = () => {
+            reader.onload = async () => {
                 const base64 = reader.result.split(',')[1];
-
                 const msg = {
                     type: "IMAGE",
                     fileBase64: base64,
@@ -261,14 +263,19 @@ const ChatGroup = ({ user, onClose, group }) => {
                     content: input,
                     groupId: group.id
                 };
-
-                stompClient.current.send("/app/messages/group", {}, JSON.stringify(msg));
-
-                // Reset lại form
-                setInput("");
-                setReply(null);
-                setFile(null);
-                shouldScrollToBottomRef.current = true;
+                try {
+                    await axiosInstance.post(
+                        "/api/messages/image",
+                        msg,
+                        { headers: { Authorization: token } }
+                    );
+                    setInput("");
+                    setReply(null);
+                    setFile(null);
+                    shouldScrollToBottomRef.current = true;
+                } catch (err) {
+                    alert("Gửi ảnh thất bại!");
+                }
             };
             reader.readAsDataURL(file);
         } else {
@@ -279,7 +286,6 @@ const ChatGroup = ({ user, onClose, group }) => {
                 type: "TEXT",
                 replyToId: reply ? reply.id : null
             };
-
             stompClient.current.send("/app/messages/group", {}, JSON.stringify(msg));
             setInput("");
             setReply(null);
@@ -467,6 +473,16 @@ const ChatGroup = ({ user, onClose, group }) => {
                                                 <>
                                                     <div className="whitespace-pre-line">
                                                         {msg.content}
+                                                        {msg.imageUrl && (
+                                                          <div className="my-2">
+                                                            <img
+                                                              src={url + msg.imageUrl}
+                                                              alt="Ảnh gửi"
+                                                              className="max-w-xs rounded-lg"
+                                                              style={{ maxHeight: 300 }}
+                                                            />
+                                                          </div>
+                                                        )}
                                                     </div>
 
                                                     {/* Message actions */}
@@ -660,7 +676,7 @@ const ChatGroup = ({ user, onClose, group }) => {
                 onClose={closeReactionModal}
                 reactions={selectedMessageReactions}
             />
-            <AddMemberModal isOpen={isOpenAddMemberModal} onAddMembers={handleAddMember} onClose={closeAddMemberModal} />
+            <AddMemberModal isOpen={isOpenAddMemberModal} onAddMembers={handleAddMember} onClose={closeAddMemberModal} groupId={group.id} />
             <GroupMembersModal isOpen={isOpenMembersModal} onClose={closeMembersModal} id={group.id}/>
         </div>
 

@@ -3,6 +3,21 @@ import axiosInstance from "../../../AppConfig/axiosConfig";
 import { useNavigate } from "react-router-dom";
 import logo from "../../../Resource/images/logo.jpg";
 
+// Danh sách tỉnh thành Việt Nam
+const vietnamProvinces = [
+  "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu", "Bắc Ninh",
+  "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước", "Bình Thuận", "Cà Mau",
+  "Cần Thơ", "Cao Bằng", "Đà Nẵng", "Đắk Lắk", "Đắk Nông", "Điện Biên",
+  "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang", "Hà Nam", "Hà Nội",
+  "Hà Tĩnh", "Hải Dương", "Hải Phòng", "Hậu Giang", "Hồ Chí Minh", "Hòa Bình",
+  "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu", "Lâm Đồng",
+  "Lạng Sơn", "Lào Cai", "Long An", "Nam Định", "Nghệ An", "Ninh Bình",
+  "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình", "Quảng Nam", "Quảng Ngãi",
+  "Quảng Ninh", "Quảng Trị", "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình",
+  "Thái Nguyên", "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh",
+  "Tuyên Quang", "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
+];
+
 const Register = () => {
   const [form, setForm] = useState({
     email: "",
@@ -12,6 +27,7 @@ const Register = () => {
     password: "",
     birthDate: "",
     phone: "",
+    province: "", 
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -34,6 +50,7 @@ const Register = () => {
     if (!form.password || !/^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\S+$).{8,}$/.test(form.password)) return "Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt";
     if (!form.birthDate) return "Vui lòng chọn ngày sinh";
     if (!form.phone || !/^(\+84|0)(3|5|7|8|9)[0-9]{8}$/.test(form.phone)) return "Số điện thoại không hợp lệ";
+    if (!form.province) return "Vui lòng chọn tỉnh thành";
     return null;
   };
 
@@ -157,6 +174,31 @@ const Register = () => {
             onChange={handleChange}
             required
           />
+          {/* Dropdown chọn tỉnh thành */}
+          <div className="relative">
+            <select
+              name="province"
+              className="w-full py-3 px-4 rounded-xl bg-white/30 text-white outline-none focus:ring-2 focus:ring-indigo-300 transition-all duration-200 shadow-sm appearance-none cursor-pointer"
+              value={form.province}
+              onChange={handleChange}
+              required
+            >
+              <option value="" disabled className="bg-gray-800 text-white">
+                Chọn tỉnh thành
+              </option>
+              {vietnamProvinces.map((province) => (
+                <option key={province} value={province} className="bg-gray-800 text-white">
+                  {province}
+                </option>
+              ))}
+            </select>
+            {/* Custom dropdown arrow */}
+            <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+              <svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
           {error && <p className="text-red-400 text-center font-semibold bg-white/20 rounded-lg py-2 px-3 animate-pulse shadow-md">{error}</p>}
           {success && <p className="text-green-300 text-center font-semibold bg-white/20 rounded-lg py-2 px-3 animate-bounce shadow-md">{success}</p>}
           <button

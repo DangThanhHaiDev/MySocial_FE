@@ -7,7 +7,6 @@ import {
   Spinner,
   Alert,
   AlertIcon,
-  AlertTitle,
   AlertDescription,
   Box,
   Flex,
@@ -15,12 +14,7 @@ import {
   IconButton,
   useColorModeValue,
 } from "@chakra-ui/react";
-import {
-  BsBookmark,
-  BsBookmarkFill,
-  BsEmojiSmile,
-  BsThreeDots,
-} from "react-icons/bs";
+
 import CommentCard from "../CommentCard/CommentCard.jsx";
 import { AiFillHeart, AiOutlineHeart } from "react-icons/ai";
 import { FaRegComment } from "react-icons/fa";
@@ -41,7 +35,7 @@ const CommentModal = ({
   sendComment,
   postId,
   commentTreeReloadKey,
-  imageUrl,
+  images,
   render
 }) => {
   const [commentText, setCommentText] = useState("");
@@ -51,6 +45,7 @@ const CommentModal = ({
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentImageIdx, setCurrentImageIdx] = useState(0);
   
   const textareaRef = useRef(null);
   const commentsSectionRef = useRef(null);
@@ -73,6 +68,7 @@ const CommentModal = ({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   };
+
 
   useEffect(() => {
     adjustTextareaHeight();
@@ -101,15 +97,12 @@ const CommentModal = ({
     }
   }, [isOpen, postId, commentTreeReloadKey, comments]);
 
-  const handleSendComment = async () => {
+  const handleSendComment = async (isHashtag) => {
     if (!commentText.trim() || isSubmitting) return;
-    
     setIsSubmitting(true);
     try {
-      await sendComment(commentText.trim(), null);
+      await sendComment(commentText.trim(), null, isHashtag);
       setCommentText("");
-      
-      // Scroll to bottom after sending comment
       setTimeout(() => {
         if (commentsSectionRef.current) {
           commentsSectionRef.current.scrollTop = commentsSectionRef.current.scrollHeight;
@@ -117,15 +110,23 @@ const CommentModal = ({
       }, 100);
     } catch (err) {
       console.error("Error sending comment:", err);
-      setError("Không thể gửi bình luận. Vui lòng thử lại.");
+      if (err.response && err.response.data && typeof err.response.data === 'string' && err.response.data.includes('không phù hợp')) {
+        alert(err.response.data);
+      } else if (err.response && err.response.data && err.response.data.message && err.response.data.message.includes('không phù hợp')) {
+        alert(err.response.data.message);
+      } else {
+        setError("Không thể gửi bình luận. Vui lòng thử lại.");
+      }
+      // KHÔNG reset input, KHÔNG scroll nếu lỗi
+      return;
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleReply = async (replyText, parentId) => {
+  const handleReply = async (replyText, parentId, isHashtag) => {
     try {
-      await sendComment(replyText, parentId);
+      await sendComment(replyText, parentId, isHashtag);
     } catch (err) {
       console.error("Error sending reply:", err);
       setError("Không thể gửi phản hồi. Vui lòng thử lại.");
@@ -173,7 +174,7 @@ const CommentModal = ({
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendComment();
+      handleSendComment(false);
     }
   };
 
@@ -213,30 +214,86 @@ const CommentModal = ({
 
             {/* Image Section */}
             <Box w="45%" position="relative" bg="black" display="flex" alignItems="center" justifyContent="center">
-              {imageLoading && (
+              {/* Carousel controls */}
+              {Array.isArray(images) && images.length > 1 && (
+                <>
+                  <Button
+                    position="absolute"
+                    left={2}
+                    top="50%"
+                    transform="translateY(-50%)"
+                    zIndex={10}
+                    size="sm"
+                    onClick={() => {
+                      setCurrentImageIdx(idx => Math.max(0, idx - 1));
+                      setImageLoading(true);
+                      setImageError(false);
+                    }}
+                    isDisabled={currentImageIdx === 0}
+                    variant="ghost"
+                    bg="blackAlpha.400"
+                    color="white"
+                    _hover={{ bg: "blackAlpha.600" }}
+                  >
+                    {"<"}
+                  </Button>
+                  <Button
+                    position="absolute"
+                    right={2}
+                    top="50%"
+                    transform="translateY(-50%)"
+                    zIndex={10}
+                    size="sm"
+                    onClick={() => {
+                      setCurrentImageIdx(idx => Math.min(images.length - 1, idx + 1));
+                      setImageLoading(true);
+                      setImageError(false);
+                    }}
+                    isDisabled={currentImageIdx === images.length - 1}
+                    variant="ghost"
+                    bg="blackAlpha.400"
+                    color="white"
+                    _hover={{ bg: "blackAlpha.600" }}
+                  >
+                    {">"}
+                  </Button>
+                  {/* Số thứ tự ảnh */}
+                  <Box position="absolute" bottom={2} left="50%" transform="translateX(-50%)" zIndex={10} px={3} py={1} bg="blackAlpha.600" borderRadius="md">
+                    <Text color="white" fontSize="sm">{currentImageIdx + 1}/{images.length}</Text>
+                  </Box>
+                </>
+              )}
+              {imageLoading && images.length > 0 && (
                 <Flex position="absolute" inset={0} alignItems="center" justifyContent="center">
                   <Spinner size="xl" color="white" />
                 </Flex>
               )}
-              
               {imageError ? (
                 <Flex direction="column" alignItems="center" color="gray.400">
                   <MdImageNotSupported size={48} />
                   <Text mt={2} fontSize="sm">Không thể tải ảnh</Text>
                 </Flex>
               ) : (
-                <img
-                  src={url + imageUrl}
-                  alt="Post content"
-                  style={{
-                    maxHeight: '100%',
-                    maxWidth: '100%',
-                    objectFit: 'contain',
-                    display: imageLoading ? 'none' : 'block'
-                  }}
-                  onLoad={handleImageLoad}
-                  onError={handleImageError}
-                />
+                Array.isArray(images) && images.length > 0 ? (
+                  <img
+                    src={url + images[currentImageIdx]}
+                    alt={`Post content ${currentImageIdx + 1}`}
+                    style={{
+                      maxHeight: '100%',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      display: imageLoading ? 'none' : 'block'
+                    }}
+                    onLoad={handleImageLoad}
+                    onError={handleImageError}
+                  />
+                ) : (
+                  <Flex direction="column" alignItems="center" color="gray.400">
+                    <MdImageNotSupported size={48} />
+                    <Text mt={2} fontSize="sm">Không có ảnh</Text>
+                    {/* <p>Không có ảnh</p> */}
+                  </Flex>
+                )
               )}
             </Box>
 
@@ -297,6 +354,7 @@ const CommentModal = ({
                           currentUserId={user?.id}
                           postOwnerId={postOwnerId}
                           img={item.user?.avatarUrl}
+                          isOpen={isOpen}
                         />
                       </Box>
                     ))}

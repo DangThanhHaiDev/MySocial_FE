@@ -1,11 +1,9 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
 import SockJS from "sockjs-client";
 import { CompatClient, Stomp } from "@stomp/stompjs";
 import axiosInstance from "../../AppConfig/axiosConfig";
 import { FiRotateCcw } from "react-icons/fi";
-import {
-  Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Text
-} from "@chakra-ui/react";
+
 import { AiFillHeart, AiOutlineHeart } from "react-icons/ai";
 import { FaAngry, FaLaugh, FaSadTear, FaSurprise, FaThumbsUp } from "react-icons/fa";
 import ReactionModal from "./ReactionModal";
@@ -13,31 +11,36 @@ import url from "../../AppConfig/urlApp";
 import { CircleX, Reply, Loader2 } from "lucide-react";
 
 const WS_URL = "http://localhost:2208/ws";
-const PAGE_SIZE = 20;
+// Đổi lại PAGE_SIZE = 20
+const PAGE_SIZE = 5;
 
 const REACTIONS = [
-  { id: 2, type: 'LOVE', icon: <AiFillHeart className="text-red-500" />, title: 'Tim' },
-  { id: 3, type: 'HAHA', icon: <FaLaugh className="text-yellow-400" />, title: 'Haha' },
-  { id: 4, type: 'SAD', icon: <FaSadTear className="text-blue-400" />, title: 'Buồn' },
-  { id: 5, type: 'ANGRY', icon: <FaAngry className="text-red-700" />, title: 'Giận' },
-  { id: 6, type: 'WOW', icon: <FaSurprise className="text-yellow-400" />, title: 'Wow' },
-  { id: 7, type: 'LIKE', icon: <FaThumbsUp className="text-blue-500" />, title: 'Like' },
-  { id: 8, type: 'NONE', icon: <AiOutlineHeart />, title: 'Like' },
+  { id: 1, type: 'LOVE', icon: <AiFillHeart className="text-red-500" />, title: 'Tim' },
+  { id: 2, type: 'HAHA', icon: <FaLaugh className="text-yellow-400" />, title: 'Haha' },
+  { id: 3, type: 'SAD', icon: <FaSadTear className="text-blue-400" />, title: 'Buồn' },
+  { id: 4, type: 'ANGRY', icon: <FaAngry className="text-red-700" />, title: 'Giận' },
+  { id: 5, type: 'WOW', icon: <FaSurprise className="text-yellow-400" />, title: 'Wow' },
+  { id: 6, type: 'LIKE', icon: <FaThumbsUp className="text-blue-500" />, title: 'Like' },
+  { id: 7, type: 'NONE', icon: <AiOutlineHeart />, title: 'Like' },
 ];
 
 const ChatBox = ({ user, onClose, currentUser }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [hasMore, setHasMore] = useState(true);
+  const [pageInfo, setPageInfo] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+
   const stompClient = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesBoxRef = useRef(null);
-  const scrollTimeoutRef = useRef(null);
-  const isScrollingRef = useRef(false);
-  const shouldScrollToBottomRef = useRef(true);
-  const lastScrollTopRef = useRef(0);
+  const topObserverRef = useRef(null);
+  const bottomObserverRef = useRef(null);
+  const topObserverInstanceRef = useRef(null);
+  const bottomObserverInstanceRef = useRef(null);
+  const isLoadingMoreRef = useRef(false); // kiểm soát trạng thái loadMore
+  const shouldAutoScrollRef = useRef(true); // kiểm soát auto scroll khi có tin nhắn mới
 
   const token = localStorage.getItem("token");
   const [revokeMsgId, setRevokeMsgId] = useState(null);
@@ -47,117 +50,204 @@ const ChatBox = ({ user, onClose, currentUser }) => {
   const [reply, setReply] = useState(null);
   const [file, setFile] = useState(null);
 
+  const [justLoaded, setJustLoaded] = useState(false);
+  const [hasUserScrolled, setHasUserScrolled] = useState(false);
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+  const [hasReachedBottomOnce, setHasReachedBottomOnce] = useState(false);
+  const [pendingScrollRestore, setPendingScrollRestore] = useState(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [pendingAutoScroll, setPendingAutoScroll] = useState(false);
+
   const oldestMsgId = messages.length > 0 ? messages[0].id : null;
 
-  const openReactionModal = (reactions) => {
-    setSelectedMessageReactions(reactions || []);
-    setShowReactionModal(true);
-  };
-
-  const closeReactionModal = () => {
-    setShowReactionModal(false);
-    setSelectedMessageReactions([]);
-  };
-
-  // Smooth scroll to bottom
-  const scrollToBottom = useCallback((behavior = "smooth") => {
-    if (messagesEndRef.current && shouldScrollToBottomRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior,
-        block: "end",
-        inline: "nearest"
-      });
-    }
-  }, []);
-
-  // Check if user is near bottom
-  const isNearBottom = useCallback(() => {
-    if (!messagesBoxRef.current) return false;
-    const { scrollTop, scrollHeight, clientHeight } = messagesBoxRef.current;
-    return scrollHeight - scrollTop - clientHeight < 100;
-  }, []);
-
-  // Load initial messages
-  const fetchHistory = async () => {
-    try {
-      setInitialLoading(true);
-      const res = await axiosInstance.get(`/api/messages/history?userId=${user.id}&size=${PAGE_SIZE}`);
-      setMessages(res.data.reverse());
-      setHasMore(res.data.length === PAGE_SIZE);
-      shouldScrollToBottomRef.current = true;
-    } catch (e) {
-      setMessages([]);
-      setHasMore(false);
-    } finally {
-      setInitialLoading(false);
-    }
-  };
-
-  // Load more messages with improved UX
+  // Load more messages khi scroll đến đầu
   const loadMoreMessages = useCallback(async () => {
-    if (loadingMore || !hasMore || !oldestMsgId) return;
-
+    if (loadingMore || !hasMore || !oldestMsgId || initialLoading) return;
     setLoadingMore(true);
+    isLoadingMoreRef.current = true;
     const currentScrollHeight = messagesBoxRef.current?.scrollHeight || 0;
-
+    const start = Date.now();
     try {
       const res = await axiosInstance.get(
         `/api/messages/history?userId=${user.id}&beforeMessageId=${oldestMsgId}&size=${PAGE_SIZE}`
       );
-
-      if (res.data.length > 0) {
-        setMessages(prev => [...res.data.reverse(), ...prev]);
-
-        // Maintain scroll position after loading more messages
-        requestAnimationFrame(() => {
-          if (messagesBoxRef.current) {
-            const newScrollHeight = messagesBoxRef.current.scrollHeight;
-            const scrollDiff = newScrollHeight - currentScrollHeight;
-            messagesBoxRef.current.scrollTop = scrollDiff;
-          }
+      const paged = res.data;
+      if (paged.content.length > 0) {
+        setMessages(prev => {
+          const newMessages = paged.content.slice().reverse().map(msg => ({
+            ...msg,
+            createdAt: typeof msg.createdAt === 'string' ? msg.createdAt : (msg.createdAt ? new Date(msg.createdAt).toISOString() : new Date().toISOString())
+          }));
+          const existingIds = new Set(prev.map(msg => msg.id));
+          const uniqueNewMessages = newMessages.filter(msg => !existingIds.has(msg.id));
+          const result = [...uniqueNewMessages, ...prev];
+          // Dùng requestAnimationFrame để giữ vị trí scroll
+          requestAnimationFrame(() => {
+            if (messagesBoxRef.current) {
+              const newScrollHeight = messagesBoxRef.current.scrollHeight;
+              const scrollDiff = newScrollHeight - currentScrollHeight;
+              messagesBoxRef.current.scrollTop = scrollDiff;
+            }
+            isLoadingMoreRef.current = false;
+          });
+          return result;
         });
       }
-
-      setHasMore(res.data.length === PAGE_SIZE);
+      setHasMore(paged.hasNext);
+      setPageInfo(paged);
     } catch (error) {
       console.error("Error loading more messages:", error);
     } finally {
-      setLoadingMore(false);
+      // Đảm bảo loading indicator hiển thị ít nhất 400ms
+      const elapsed = Date.now() - start;
+      const minDelay = 400;
+      if (elapsed < minDelay) {
+        setTimeout(() => {
+          setLoadingMore(false);
+          setInitialLoading(false);
+        }, minDelay - elapsed);
+      } else {
+        setLoadingMore(false);
+        setInitialLoading(false);
+      }
     }
-  }, [loadingMore, hasMore, oldestMsgId, user.id]);
+  }, [loadingMore, hasMore, oldestMsgId, user.id, initialLoading, messages.length]);
 
-  // Improved scroll handler with debouncing
-  const handleScroll = useCallback((e) => {
+  // Scroll to bottom
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, []);
+
+  // Scroll event handler
+  const handleScroll = (e) => {
     const target = e.target;
     const { scrollTop, scrollHeight, clientHeight } = target;
-
-    // Clear previous timeout
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
+    // Nếu user ở gần cuối (cách bottom < 100px), cho phép auto scroll
+    if (scrollHeight - scrollTop - clientHeight < 100) {
+      shouldAutoScrollRef.current = true;
+    } else {
+      shouldAutoScrollRef.current = false;
     }
+  };
 
-    isScrollingRef.current = true;
-
-    // Update scroll position tracking
-    shouldScrollToBottomRef.current = isNearBottom();
-
-    // Load more messages when scrolled to top
-    if (scrollTop < 50 && !loadingMore && hasMore) {
-      loadMoreMessages();
-    }
-
-    // Debounced scroll end detection
-    scrollTimeoutRef.current = setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 150);
-
-    lastScrollTopRef.current = scrollTop;
-  }, [loadMoreMessages, loadingMore, hasMore, isNearBottom]);
-
-  // Load initial messages when user changes
+  // Setup Intersection Observer for loading more messages
   useEffect(() => {
-    fetchHistory();
-  }, [user]);
+    if (!hasMore || initialLoading) return;
+    const topObserver = topObserverRef.current;
+    if (!topObserver) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && !loadingMore) {
+          loadMoreMessages();
+        }
+      },
+      {
+        root: messagesBoxRef.current,
+        rootMargin: '50px',
+        threshold: 0.1
+      }
+    );
+    observer.observe(topObserver);
+    topObserverInstanceRef.current = observer;
+    return () => {
+      if (topObserverInstanceRef.current) {
+        topObserverInstanceRef.current.disconnect();
+      }
+    };
+  }, [hasMore, loadingMore, loadMoreMessages, initialLoading, messages.length]);
+
+  // Setup Intersection Observer for auto-scroll detection
+  useEffect(() => {
+    const bottomObserver = bottomObserverRef.current;
+    if (!bottomObserver) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        // Không cần làm gì với entry.isIntersecting
+        // Chỉ cần có observer này để detect khi cần scroll
+      },
+      {
+        root: messagesBoxRef.current,
+        rootMargin: '0px',
+        threshold: 0.1
+      }
+    );
+
+    observer.observe(bottomObserver);
+    bottomObserverInstanceRef.current = observer;
+
+    return () => {
+      if (bottomObserverInstanceRef.current) {
+        bottomObserverInstanceRef.current.disconnect();
+      }
+    };
+  }, []);
+
+  // Load initial messages
+  useEffect(() => {
+    console.log('useEffect loadInitialMessages called', user?.id);
+    if (!user?.id) return;
+
+    const loadInitialMessages = async () => {
+      try {
+        setInitialLoading(true);
+        setMessages([]); // Đã reset về rỗng
+        setHasMore(true);
+
+        const res = await axiosInstance.get(`/api/messages/history?userId=${user.id}&size=${PAGE_SIZE}`);
+        const paged = res.data;
+        const msgs = paged.content
+          .slice().reverse()
+          .map(msg => ({
+            ...msg,
+            createdAt: typeof msg.createdAt === 'string' ? msg.createdAt : (msg.createdAt ? new Date(msg.createdAt).toISOString() : new Date().toISOString())
+          }));
+        setMessages(msgs);
+        setHasMore(paged.hasNext);
+        setPageInfo(paged);
+        setHasLoadedInitial(true); // Đánh dấu đã load xong initial
+        console.log('Initial messages:', msgs.length, msgs);
+      } catch (e) {
+        console.error("Error fetching history:", e);
+        setMessages([]);
+        setHasMore(false);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    loadInitialMessages();
+  }, [user?.id]);
+
+  // Auto scroll to bottom khi có tin nhắn mới và user đang ở gần cuối
+  useEffect(() => {
+    if (!initialLoading && messages.length > 0 && shouldAutoScrollRef.current && !isLoadingMoreRef.current) {
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+        }
+      }, 100);
+    }
+  }, [messages.length, initialLoading]);
+
+  useLayoutEffect(() => {
+    if (pendingScrollRestore && messagesBoxRef.current) {
+      const { scrollTopBefore, scrollHeightBefore } = pendingScrollRestore;
+      const scrollHeightAfter = messagesBoxRef.current.scrollHeight;
+      console.log('---RESTORE SCROLL---');
+      console.log('Before:', { scrollTopBefore, scrollHeightBefore });
+      console.log('After:', { scrollHeightAfter });
+      messagesBoxRef.current.scrollTop = scrollTopBefore + (scrollHeightAfter - scrollHeightBefore);
+      setPendingScrollRestore(null);
+      isLoadingMoreRef.current = false; // Đánh dấu loadMore đã xong
+      setPendingAutoScroll(false); // Cho phép auto scroll lại sau khi restore scroll xong
+      console.log('Restored scrollTop:', messagesBoxRef.current.scrollTop);
+    }
+  }, [pendingScrollRestore, messages]);
 
   // WebSocket connection
   useEffect(() => {
@@ -188,13 +278,20 @@ const ChatBox = ({ user, onClose, currentUser }) => {
               : m
           ));
         } else if (body.data) {
-          // New message received
-          const wasNearBottom = isNearBottom();
-          setMessages(prev => [...prev, body.data]);
-
-          // Auto-scroll for new messages only if user was near bottom
-          if (wasNearBottom) {
-            shouldScrollToBottomRef.current = true;
+          setMessages(prev => [
+            ...prev,
+            {
+              ...body.data,
+              createdAt: typeof body.data.createdAt === 'string' ? body.data.createdAt : (body.data.createdAt ? new Date(body.data.createdAt).toISOString() : new Date().toISOString())
+            }
+          ]);
+          // Nếu user đang ở gần cuối, auto scroll
+          if (shouldAutoScrollRef.current) {
+            setTimeout(() => {
+              if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+              }
+            }, 100);
           }
         } else if (body.action === "revoke" && body.messageId) {
           setMessages(prev => prev.map(m =>
@@ -205,30 +302,30 @@ const ChatBox = ({ user, onClose, currentUser }) => {
     });
 
     return () => {
-      if (stompClient.current) stompClient.current.disconnect();
+      if (stompClient.current) {
+        stompClient.current.disconnect();
+      }
     };
-  }, [user, currentUser, isNearBottom]);
+  }, [user, currentUser, scrollToBottom]);
 
-  // Auto-scroll for new messages
-  useEffect(() => {
-    if (messages.length > 0 && shouldScrollToBottomRef.current && !isScrollingRef.current) {
-      // Small delay to ensure DOM is updated
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
-    }
-  }, [messages, scrollToBottom]);
+  const openReactionModal = (reactions) => {
+    setSelectedMessageReactions(reactions || []);
+    setShowReactionModal(true);
+  };
+
+  const closeReactionModal = () => {
+    setShowReactionModal(false);
+    setSelectedMessageReactions([]);
+  };
 
   // Send message
   const sendMessage = () => {
     if (!input.trim() && !file) return;
 
-    // Nếu có file thì đọc file trước khi gửi
     if (file) {
       const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result.split(',')[1]; // loại bỏ phần đầu "data:image/png;base64,..."
-
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
         const msg = {
           receiverId: user.id,
           type: "IMAGE",
@@ -236,35 +333,44 @@ const ChatBox = ({ user, onClose, currentUser }) => {
           fileName: file.name,
           replyToId: reply ? reply.id : null,
           content: input,
-
         };
-
-        stompClient.current.send("/app/messages", {}, JSON.stringify(msg));
-
-        // Reset lại form
-        setInput("");
-        setReply(null);
-        setFile(null);
-        shouldScrollToBottomRef.current = true;
+        try {
+          await axiosInstance.post(
+            "/api/conversations/image",
+            msg,
+            { headers: { Authorization: token } }
+          );
+          setInput("");
+          setReply(null);
+          setFile(null);
+          setTimeout(() => {
+            if (shouldAutoScrollRef.current && messagesEndRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+            }
+          }, 100);
+        } catch (err) {
+          alert("Gửi ảnh thất bại!");
+        }
       };
       reader.readAsDataURL(file);
     } else {
-      // Gửi tin nhắn văn bản như bình thường
       const msg = {
         receiverId: user.id,
         content: input,
         type: "TEXT",
         replyToId: reply ? reply.id : null
       };
-
       stompClient.current.send("/app/messages", {}, JSON.stringify(msg));
       setInput("");
       setReply(null);
       setFile(null);
-      shouldScrollToBottomRef.current = true;
+      setTimeout(() => {
+        if (shouldAutoScrollRef.current && messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+        }
+      }, 100);
     }
   };
-
 
   const handleConfirmRevoke = () => {
     if (stompClient.current && stompClient.current.connected && revokeMsgId) {
@@ -287,6 +393,7 @@ const ChatBox = ({ user, onClose, currentUser }) => {
     };
 
     stompClient.current.send("/app/messages/reaction", {}, JSON.stringify(reactionPayload));
+    setShowReaction(false);
   };
 
   const handleDelReact = (messageId) => {
@@ -301,6 +408,7 @@ const ChatBox = ({ user, onClose, currentUser }) => {
     };
 
     stompClient.current.send("/app/messages/reaction/delete", {}, JSON.stringify(reactionPayload));
+    setShowReaction(false);
   };
 
   return (
@@ -338,11 +446,13 @@ const ChatBox = ({ user, onClose, currentUser }) => {
 
       {/* Messages Container */}
       <div
-        className="flex-1 overflow-y-auto px-4 py-2 space-y-2 max-h-[50vh] scroll-smooth"
-        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-2 space-y-2 max-h-[50vh] scroll-smooth hide-scrollbar"
         ref={messagesBoxRef}
         style={{ scrollBehavior: 'smooth' }}
+        onScroll={handleScroll}
       >
+        {/* Top observer for loading more messages - luôn render ở đầu */}
+        <div ref={topObserverRef} style={{ height: 8 }} />
         {/* Loading more indicator */}
         {loadingMore && (
           <div className="flex items-center justify-center py-3">
@@ -350,7 +460,6 @@ const ChatBox = ({ user, onClose, currentUser }) => {
             <span className="text-sm text-gray-500">Đang tải thêm tin nhắn...</span>
           </div>
         )}
-
         {/* Initial loading */}
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -368,6 +477,7 @@ const ChatBox = ({ user, onClose, currentUser }) => {
           </div>
         ) : (
           <>
+            {console.log('Rendering messages:', messages.length)}
             {messages.map((msg, idx) => {
               const isMine = msg.sender && msg.sender.id === currentUser.id;
               return (
@@ -376,6 +486,7 @@ const ChatBox = ({ user, onClose, currentUser }) => {
                   className={`flex ${isMine ? "justify-end" : "justify-start"} mb-1`}
                   onMouseLeave={() => setShowReaction(false)}
                 >
+
                   <div className={`group relative max-w-[80%] ${isMine ? "order-1" : "order-2"}`}>
                     {/* Reply preview */}
                     {msg.replyTo && (
@@ -413,6 +524,16 @@ const ChatBox = ({ user, onClose, currentUser }) => {
                         <>
                           <div className="whitespace-pre-line">
                             {msg.content}
+                            {msg.imageUrl && (
+                              <div className="my-2">
+                                <img
+                                  src={url + msg.imageUrl}
+                                  alt="Ảnh gửi"
+                                  className="max-w-xs rounded-lg"
+                                  style={{ maxHeight: 300 }}
+                                />
+                              </div>
+                            )}
                           </div>
 
                           {/* Message actions */}
@@ -452,7 +573,9 @@ const ChatBox = ({ user, onClose, currentUser }) => {
 
                     {/* Timestamp */}
                     <div className={`text-xs text-gray-400 mt-1 ${isMine ? "text-right" : "text-left"}`}>
-                      {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      {msg.createdAt
+                        ? new Date(msg.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+                        : ""}
                     </div>
 
                     {/* Reactions */}
@@ -477,7 +600,7 @@ const ChatBox = ({ user, onClose, currentUser }) => {
                               className="text-lg hover:scale-125 transition-transform p-1"
                               title={reaction.title}
                               onClick={() => {
-                                if (reaction.id !== 8) {
+                                if (reaction.id !== 7) {
                                   handleReact(msg.id, reaction.id);
                                 } else {
                                   handleDelReact(msg.id);
@@ -494,6 +617,9 @@ const ChatBox = ({ user, onClose, currentUser }) => {
                 </div>
               );
             })}
+
+            {/* Bottom observer for auto-scroll detection */}
+            <div ref={bottomObserverRef} className="h-1" />
             <div ref={messagesEndRef} />
           </>
         )}

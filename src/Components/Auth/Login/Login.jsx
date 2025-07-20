@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { FiMail, FiLock } from "react-icons/fi";
 
 import { useDispatch, useSelector } from "react-redux";
 import { login } from "../../../GlobalState/auth/Action";
 import logo from "../../../Resource/images/logo.jpg";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
     const [email, setEmail] = useState("");
@@ -12,14 +13,21 @@ const Login = () => {
     const [err, setErr]= useState("")
     const dispatch = useDispatch()
     const {error, user} = useSelector(state => state.auth)
+    const navigate = useNavigate();
     
     useEffect(()=>{
        if(error && error!=="Access Denied"){
-        setErr(error)
+        if(error.includes("bị khóa")){
+            setErr("Tài khoản của bạn đã bị khóa do vi phạm nội dung nào đó. Vui lòng chờ đến khi admin mở khóa");
+        }else{
+            setErr("Tài khoản hoặc mật khẩu không đúng. Vui lòng thử lại");
+        }
        }
+       
     }, [error])
 
     const handleSubmit = (e) => {
+        
         setErr("")
         e.preventDefault();
         setLoading(true);
@@ -30,7 +38,19 @@ const Login = () => {
 
     const handleLogin = () => {
         dispatch(login({email, password}))
+    
     }
+    useEffect(() => {
+        if(user){
+            if(user.role === "ADMIN"){
+                navigate("/admin/users", { replace: true })
+            }else{
+                navigate("/", { replace: true })
+            }
+        }
+    }, [user, navigate])
+         
+  
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-700 via-indigo-700 to-blue-700 p-4">
@@ -68,7 +88,7 @@ const Login = () => {
                     </div>
                     {
                         err && 
-                        <p className="text-red-400 text-center font-semibold bg-white/20 rounded-lg py-2 px-3 shadow-md">Tên đăng nhập hoặc mật khẩu không đúng</p>
+                        <p className="text-red-400 text-center font-semibold bg-white/20 rounded-lg py-2 px-3 shadow-md">{err}</p>
                     }
                     <button
                         type="submit"

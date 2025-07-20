@@ -36,3 +36,12 @@
     transform: rotate(360deg);
   }
 }
+
+/* Ẩn hoàn toàn thanh scroll trên mọi trình duyệt hiện đại */
+.hide-scrollbar {
+  scrollbar-width: none;         /* Firefox */
+  -ms-overflow-style: none;      /* IE 10+ */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;                 /* Chrome/Safari/Webkit */
+}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   ModalOverlay,
@@ -14,19 +14,42 @@ import {
 } from "@chakra-ui/react";
 import { AiFillHeart } from "react-icons/ai";
 import { FaAngry, FaLaugh, FaSadTear, FaSurprise, FaThumbsUp } from "react-icons/fa";
+import axiosInstance from "../../AppConfig/axiosConfig";
 
 const REACTIONS = [
-  { id: 2, type: 'LOVE', icon: <AiFillHeart className="text-red-500" />, title: 'Tim' },
-  { id: 3, type: 'HAHA', icon: <FaLaugh className="text-yellow-400" />, title: 'Haha' },
-  { id: 4, type: 'SAD', icon: <FaSadTear className="text-blue-400" />, title: 'Buồn' },
-  { id: 5, type: 'ANGRY', icon: <FaAngry className="text-red-700" />, title: 'Giận' },
-  { id: 6, type: 'WOW', icon: <FaSurprise className="text-yellow-400" />, title: 'Wow' },
-  { id: 7, type: 'LIKE', icon: <FaThumbsUp className="text-blue-500" />, title: 'Like' },
+  { id: 1, type: 'LOVE', icon: <AiFillHeart className="text-red-500" />, title: 'Tim' },
+  { id: 2, type: 'HAHA', icon: <FaLaugh className="text-yellow-400" />, title: 'Haha' },
+  { id: 3, type: 'SAD', icon: <FaSadTear className="text-blue-400" />, title: 'Buồn' },
+  { id: 4, type: 'ANGRY', icon: <FaAngry className="text-red-700" />, title: 'Giận' },
+  { id: 5, type: 'WOW', icon: <FaSurprise className="text-yellow-400" />, title: 'Wow' },
+  { id: 6, type: 'LIKE', icon: <FaThumbsUp className="text-blue-500" />, title: 'Like' },
 ];
 
-const ReactionModal = ({ isOpen, onClose, reactions = [] }) => {
-  // Nhóm reactions theo type
-  const groupedReactions = reactions.reduce((acc, reaction) => {
+const ReactionModal = ({ isOpen, onClose, reactions = [], postId = null }) => {
+
+  const [fetchedReactions, setFetchedReactions] = useState([]);
+  const dataToRender = postId !== null ? fetchedReactions : reactions;
+
+
+  useEffect(() => {
+    if (postId !== null) {
+      getReactionByPost()
+    }
+  }, [postId, isOpen])
+
+
+  const getReactionByPost = async () => {
+    try {
+      const response = await axiosInstance.get(`/api/post/reaction/${postId}`)
+      setFetchedReactions(response.data)
+      console.log(response.data);
+      
+    } catch (error) {
+
+    }
+  }
+
+  const groupedReactions = dataToRender.reduce((acc, reaction) => {
     const type = reaction.reaction.reactionType;
     if (!acc[type]) {
       acc[type] = [];
@@ -35,7 +58,6 @@ const ReactionModal = ({ isOpen, onClose, reactions = [] }) => {
     return acc;
   }, {});
 
-  // Lấy icon từ REACTIONS array
   const getReactionIcon = (type) => {
     return REACTIONS.find(r => r.type === type)?.icon;
   };
@@ -43,6 +65,7 @@ const ReactionModal = ({ isOpen, onClose, reactions = [] }) => {
   const getReactionTitle = (type) => {
     return REACTIONS.find(r => r.type === type)?.title;
   };
+
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered size="md">
@@ -52,13 +75,13 @@ const ReactionModal = ({ isOpen, onClose, reactions = [] }) => {
           <Flex align="center" gap={2}>
             <Text>Cảm xúc</Text>
             <Badge colorScheme="blue" variant="solid" borderRadius="full">
-              {reactions.length}
+              {dataToRender.length}
             </Badge>
           </Flex>
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
-          {reactions.length === 0 ? (
+          {dataToRender.length === 0 ? (
             <Text color="gray.500" textAlign="center" py={4}>
               Chưa có ai react tin nhắn này
             </Text>
@@ -78,7 +101,7 @@ const ReactionModal = ({ isOpen, onClose, reactions = [] }) => {
                       {userReactions.length}
                     </Badge>
                   </Flex>
-                  
+
                   {/* Danh sách user đã react */}
                   {userReactions.map((reaction, index) => (
                     <Flex

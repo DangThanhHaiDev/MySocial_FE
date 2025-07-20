@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import axiosInstance from "../../AppConfig/axiosConfig";
 import { FaUserFriends, FaUserPlus, FaUserTimes, FaSearch, FaUser, FaCommentDots, FaTrash } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -11,35 +11,86 @@ const FriendShip = () => {
   const [tab, setTab] = useState("requests");
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  
+  // Suggestion state with pagination
   const [suggestions, setSuggestions] = useState([]);
+  const [suggestionPage, setSuggestionPage] = useState(0);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionHasNext, setSuggestionHasNext] = useState(true);
+  const [suggestionTotal, setSuggestionTotal] = useState(0);
+  
+  // Ref for scroll detection
+  const suggestionContainerRef = useRef(null);
 
   useEffect(() => {
-        fetchSuggestions();
-    }, []);
+    if (tab === "suggestion") {
+      // Reset and fetch first page when switching to suggestion tab
+      setSuggestions([]);
+      setSuggestionPage(0);
+      setSuggestionHasNext(true);
+      fetchSuggestions(0, true);
+    }
+  }, [tab]);
 
-    const fetchSuggestions = async () => {
-        try {
-            const res = await axiosInstance.get("/api/friends/suggest");
-            setSuggestions(res.data);
-        } catch (err) {
-          console.log(err);
-          
-        } 
-    };
+  const fetchSuggestions = async (page = 0, reset = false) => {
+    if (suggestionLoading || (!suggestionHasNext && !reset)) return;
+    
+    setSuggestionLoading(true);
+    try {
+      const res = await axiosInstance.get(`/api/friends/suggestions?page=${page}&size=5`);
+      const { suggestions: newSuggestions, hasNext, totalElements } = res.data;
+      
+      if (reset) {
+        setSuggestions(newSuggestions);
+      } else {
+        setSuggestions(prev => [...prev, ...newSuggestions]);
+      }
+      
+      setSuggestionHasNext(hasNext);
+      setSuggestionTotal(totalElements);
+      setSuggestionPage(page);
+    } catch (err) {
+      console.log("Error fetching suggestions:", err);
+    } finally {
+      setSuggestionLoading(false);
+    }
+  };
 
-    const handleAddFriend = async(userId) => {
-        try {
-            const resposne = await axiosInstance.post(`/api/friends/request/${userId}`)
-            const {data} = resposne
-            if(data.id){
-                console.log(data);
-                
-            }
-        } catch (error) {
-            console.log(error);
-        }
-        setSuggestions(prev => prev.filter(u => u.id !== userId));
-    };
+  // Infinite scroll handler
+  const handleScroll = useCallback(() => {
+    if (!suggestionContainerRef.current || tab !== "suggestion") return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = suggestionContainerRef.current;
+    
+    // Load more when user scrolls to bottom
+    if (scrollTop + clientHeight >= scrollHeight - 100) {
+      if (suggestionHasNext && !suggestionLoading) {
+        fetchSuggestions(suggestionPage + 1);
+      }
+    }
+  }, [suggestionPage, suggestionHasNext, suggestionLoading, tab]);
+
+  useEffect(() => {
+    const container = suggestionContainerRef.current;
+    if (container && tab === "suggestion") {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll, tab]);
+
+  const handleAddFriend = async (userId) => {
+    try {
+      const response = await axiosInstance.post(`/api/friends/request/${userId}`);
+      const { data } = response;
+      if (data.id) {
+        console.log("Friend request sent:", data);
+      }
+    } catch (error) {
+      console.log("Error sending friend request:", error);
+    }
+    // Remove from suggestions after sending request
+    setSuggestions(prev => prev.filter(u => u.id !== userId));
+  };
 
   useEffect(() => {
     if (tab === "requests") fetchRequests();
@@ -51,7 +102,6 @@ const FriendShip = () => {
       const res = await axiosInstance.get("/api/friends/requests");
       setRequests(res.data);
       console.log(res.data);
-      
     } catch (err) {
       setRequests([]);
     }
@@ -123,6 +173,7 @@ const FriendShip = () => {
         >
           <FaUserFriends /> Bạn bè
         </button>
+        
         <button
           className={`px-4 py-2 rounded font-semibold flex items-center gap-2 shadow ${tab === "suggestion" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700"}`}
           onClick={() => setTab("suggestion")}
@@ -130,14 +181,20 @@ const FriendShip = () => {
           <FaUserFriends /> Đề xuất
         </button>
       </div>
+
       {tab === "requests" && (
         <>
           {requests.length === 0 && <div className="text-gray-500 text-center py-8">Không có lời mời nào.</div>}
           <div className="space-y-4">
             {requests.map((req) => (
               <div key={req.id} className="flex items-center justify-between bg-white rounded-2xl shadow-lg p-4 hover:shadow-2xl transition">
-                <div className="flex items-center gap-3 cursor-pointer" >
-                  <img src={req.requester?.avatarUrl || DEFAULT_AVATAR} onClick={()=>navigate(`/profile/${req.requester.id}`)} alt="avatar" className="h-12 w-12 rounded-full object-cover border-2 border-blue-200" />
+                <div className="flex items-center gap-3 cursor-pointer">
+                  <img 
+                    src={req.requester?.avatarUrl || DEFAULT_AVATAR} 
+                    onClick={() => navigate(`/profile/${req.requester.id}`)} 
+                    alt="avatar" 
+                    className="h-12 w-12 rounded-full object-cover border-2 border-blue-200" 
+                  />
                   <div>
                     <p className="font-semibold text-lg">{req.requester?.firstName} {req.requester?.lastName}</p>
                     <p className="text-xs text-gray-500">{req.requester?.email}</p>
@@ -162,6 +219,7 @@ const FriendShip = () => {
           </div>
         </>
       )}
+
       {tab === "friends" && (
         <>
           <div className="flex items-center gap-2 mb-4 bg-white rounded-lg px-3 py-2 shadow">
@@ -174,7 +232,12 @@ const FriendShip = () => {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          {filteredFriends.length === 0 && <div className="text-gray-500 text-center py-8">Bạn chưa có bạn bè nào.<br />Hãy gửi lời mời kết bạn để kết nối nhiều hơn!</div>}
+          {filteredFriends.length === 0 && (
+            <div className="text-gray-500 text-center py-8">
+              Bạn chưa có bạn bè nào.<br />
+              Hãy gửi lời mời kết bạn để kết nối nhiều hơn!
+            </div>
+          )}
           <div className="space-y-4">
             {filteredFriends.map((friend) => (
               <div key={friend.id} className="flex items-center gap-3 bg-white rounded-2xl shadow-lg p-4 hover:shadow-2xl transition">
@@ -184,38 +247,97 @@ const FriendShip = () => {
                   <p className="text-xs text-gray-500">{friend.email}</p>
                 </div>
                 <div className="ml-auto flex gap-2">
-                  <button title="Xem profile" onClick={() => handleViewProfile(friend.id)} className="bg-gray-100 hover:bg-blue-100 text-blue-600 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"><FaUser /> Profile</button>
-                  <button title="Hủy kết bạn" onClick={() => handleUnfriend(friend.id)} className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"><FaTrash /> Hủy</button>
+                  <button 
+                    title="Xem profile" 
+                    onClick={() => handleViewProfile(friend.id)} 
+                    className="bg-gray-100 hover:bg-blue-100 text-blue-600 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"
+                  >
+                    <FaUser /> Profile
+                  </button>
+                  <button 
+                    title="Hủy kết bạn" 
+                    onClick={() => handleUnfriend(friend.id)} 
+                    className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-1 rounded transition text-xs font-semibold flex items-center gap-1"
+                  >
+                    <FaTrash /> Hủy
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         </>
       )}
-      {
-        tab === "suggestion" && (
-          <div className="space-y-5 mt-5">
 
+      {tab === "suggestion" && (
+        <div className="space-y-4">
+          {/* Header with total count */}
+          <div className="text-sm text-gray-600 mb-4">
+            Tổng cộng: {suggestionTotal} gợi ý
+          </div>
+          
+          {/* Scrollable container */}
+          <div 
+            ref={suggestionContainerRef}
+            className="max-h-96 overflow-y-auto space-y-4"
+            style={{ scrollBehavior: 'smooth' }}
+          >
             {suggestions.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-2 bg-white rounded shadow">
+              <div key={user.id} className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition">
                 <div className="flex items-center gap-3">
-                  <img className="h-10 w-10 rounded-full object-cover" src={user.avatarUrl || "/default-image.jpg"} alt="avatar" />
+                  <img 
+                    className="h-12 w-12 rounded-full object-cover border-2 border-blue-200 cursor-pointer" 
+                    src={user.avatarUrl || DEFAULT_AVATAR} 
+                    alt="avatar"
+                    onClick={() => navigate(`/profile/${user.id}`)}
+                  />
                   <div>
-                    <p className="font-semibold text-sm">{user.firstName} {user.lastName}</p>
+                    <p className="font-semibold text-lg">{user.firstName} {user.lastName}</p>
                     <p className="text-xs text-gray-500">{user.email}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                        {user.suggestionReason}
+                      </span>
+                      {user.mutualFriendsCount > 0 && (
+                        <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">
+                          {user.mutualFriendsCount} bạn chung
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <button
-                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition"
+                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition font-semibold shadow flex items-center gap-2"
                   onClick={() => handleAddFriend(user.id)}
                 >
-                  Add Friend
+                  <FaUserPlus /> Kết bạn
                 </button>
               </div>
             ))}
+            
+            {/* Loading indicator */}
+            {suggestionLoading && (
+              <div className="text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <p className="text-sm text-gray-500 mt-2">Đang tải...</p>
+              </div>
+            )}
+            
+            {/* No more data indicator */}
+            {!suggestionHasNext && suggestions.length > 0 && (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                Không còn gợi ý nào khác
+              </div>
+            )}
           </div>
-        )
-      }
+          
+          {/* Empty state */}
+          {suggestions.length === 0 && !suggestionLoading && (
+            <div className="text-gray-500 text-center py-8">
+              Không có gợi ý kết bạn nào
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

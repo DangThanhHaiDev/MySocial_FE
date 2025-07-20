@@ -34,7 +34,6 @@ const HomePage = () => {
         if (node) observer.current.observe(node)
     }
 
-    // Refresh data
     const refreshData = async () => {
         setRefreshing(true)
         try {
@@ -45,7 +44,6 @@ const HomePage = () => {
             setPage(0)
             setHasMore(newPosts.length === 5)
 
-            // Show success message
             console.log('Data refreshed successfully!')
         } catch (err) {
             console.error('Error refreshing data:', err)
@@ -53,7 +51,6 @@ const HomePage = () => {
         setRefreshing(false)
     }
 
-    // Scroll to top
     const scrollToTop = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }
@@ -129,7 +126,6 @@ const HomePage = () => {
 
     return (
         <div>
-            {/* Scroll to top button */}
             {showScrollTop && (
                 <button
                     onClick={scrollToTop}
@@ -144,7 +140,6 @@ const HomePage = () => {
 
             <div className='mt-10 flex flex-col lg:flex-row w-full justify-center'>
                 <div className='w-full lg:w-[50%] px-2 lg:px-10'>
-                    {/* Nút làm mới ở đầu trang */}
                     <div className="flex justify-center mb-6">
                         <button
                             onClick={refreshData}

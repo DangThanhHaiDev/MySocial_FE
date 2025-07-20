@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { 
   X, 
   ImageIcon, 
@@ -17,12 +17,13 @@ import { useSelector } from "react-redux";
 
 const CreatePostModal = ({ onClose, isOpen }) => {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [caption, setCaption] = useState("");
   const [location, setLocation] = useState("");
   const [privacy, setPrivacy] = useState("PUBLIC");
   const [showPrivacyDropdown, setShowPrivacyDropdown] = useState(false);
   const user = useSelector(state => state.auth.user)
+  const fileInputRef = useRef();
 
  
 
@@ -60,10 +61,10 @@ const CreatePostModal = ({ onClose, isOpen }) => {
   const handleDrop = (event) => {
     event.preventDefault();
     setIsDragOver(false);
-    const droppedFile = event.dataTransfer.files[0];
-    const extension = droppedFile.type;
-    if (extension.startsWith("image/") || extension.startsWith("video/")) {
-      setFile(droppedFile);
+    const droppedFiles = Array.from(event.dataTransfer.files);
+    const extensions = droppedFiles.map(f => f.type);
+    if (extensions.some(ext => ext.startsWith("image/") || ext.startsWith("video/"))) {
+      setFiles(droppedFiles);
     } else {
       alert("Vui lòng chọn hình ảnh hoặc video");
     }
@@ -71,16 +72,11 @@ const CreatePostModal = ({ onClose, isOpen }) => {
 
   const handleOnChangeFile = (event) => {
     event.preventDefault();
-    const fileSelected = event.target.files[0];
-    if (fileSelected) {
-      const extension = fileSelected.type;
-      if (extension.startsWith("image/") || extension.startsWith("video/")) {
-        setFile(fileSelected);
-      } else {
-        setFile(null);
-        alert("Vui lòng chọn hình ảnh hoặc video");
-      }
-    }
+    const selectedFiles = Array.from(event.target.files);
+    // Thêm file mới vào danh sách đã chọn, không ghi đè
+    setFiles(prev => [...prev, ...selectedFiles]);
+    // Reset input để lần sau chọn lại file cũ vẫn trigger được
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleCaptionChange = (event) => {
@@ -89,7 +85,7 @@ const CreatePostModal = ({ onClose, isOpen }) => {
   const handleReset = ()=>{
     setCaption("")
     setLocation("")
-    setFile(null)
+    setFiles([])
   }
 
   const handleSharePost = async (e) => {
@@ -98,7 +94,7 @@ const CreatePostModal = ({ onClose, isOpen }) => {
     formData.append("caption", caption);
     formData.append("location", location);
     formData.append("privacy", privacy);
-    formData.append("file", file);
+    files.forEach(f => formData.append("files", f));
 
    
     
@@ -115,12 +111,18 @@ const CreatePostModal = ({ onClose, isOpen }) => {
     } catch (error) {
       console.log(error);
       handleReset()
-      alert("Có lỗi xảy ra khi đăng bài viết");
+      if (error.response && error.response.data && typeof error.response.data === 'string' && error.response.data.includes('không phù hợp')) {
+        alert(error.response.data);
+      } else if (error.response && error.response.data && error.response.data.message && error.response.data.message.includes('không phù hợp')) {
+        alert(error.response.data.message);
+      } else {
+        alert("Có lỗi xảy ra khi đăng bài viết");
+      }
     }
   };
 
-  const removeFile = () => {
-    setFile(null);
+  const removeFile = (idx) => {
+    setFiles(prev => prev.filter((_, i) => i !== idx));
   };
 
   if (!isOpen) return null;
@@ -135,7 +137,7 @@ const CreatePostModal = ({ onClose, isOpen }) => {
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                disabled={!file || !caption.trim()}
+                disabled={!files.length && !caption.trim()}
                 className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
                 onClick={handleSharePost}
               >
@@ -155,20 +157,46 @@ const CreatePostModal = ({ onClose, isOpen }) => {
           <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Left Side - Media Upload */}
             <div className="w-1/2 p-6 bg-gradient-to-br from-gray-50 to-gray-100">
-              {file ? (
+              {files.length > 0 ? (
                 <div className="relative h-full rounded-xl overflow-hidden shadow-lg">
-                  {file.type.startsWith("image/") ? (
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <video
-                      src={URL.createObjectURL(file)}
-                      className="w-full h-full object-cover"
-                      controls
-                    />
+                  {/* Preview nhiều ảnh + ô thêm ảnh mới + input file luôn render */}
+                  {(
+                    <div className="flex gap-2 flex-wrap mb-4">
+                      {files.map((file, idx) => (
+                        <div key={idx} className="relative inline-block">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt="Preview"
+                            className="w-24 h-24 object-cover rounded"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeFile(idx)}
+                            className="absolute top-1 right-1 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full shadow p-1 text-xs"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      {/* Ô thêm ảnh mới */}
+                      <label
+                        htmlFor="file-upload"
+                        className="w-24 h-24 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-gray-100"
+                        style={{ minWidth: 96, minHeight: 96 }}
+                      >
+                        <span className="text-3xl text-gray-400">+</span>
+                      </label>
+                      {/* Input file luôn luôn render ở đây */}
+                      <input
+                        type="file"
+                        id="file-upload"
+                        className="hidden"
+                        accept="image/*"
+                        multiple
+                        onChange={handleOnChangeFile}
+                        ref={fileInputRef}
+                      />
+                    </div>
                   )}
                   <button
                     type="button"
@@ -216,8 +244,10 @@ const CreatePostModal = ({ onClose, isOpen }) => {
                         type="file"
                         id="file-upload"
                         className="hidden"
-                        accept="image/*,video/*"
+                        accept="image/*"
+                        multiple
                         onChange={handleOnChangeFile}
+                        ref={fileInputRef}
                       />
                     </div>
                   </div>

@@ -28,8 +28,7 @@ const Slidebar = () => {
     const token = localStorage.getItem("token");
 
     useEffect(() => {
-        dispatch(getUserByJwt(navigate))
-        navigate("/")
+        // dispatch(getUserByJwt(navigate)) // Đã xóa để tránh vòng lặp
         fetchUnread();
         connectWebSocket();
         return () => {
@@ -85,22 +84,22 @@ const Slidebar = () => {
     }
 
     const handleOnTab = (title) => {
-        if (title === "Profile") {
+        if (title === "Trang cá nhân") {
             navigate("/username")
         }
-        else if (title === "Home") {
+        else if (title === "Trang chủ") {
             navigate("/")
         }
-        else if (title === "Create") {
+        else if (title === "Tạo bài viết") {
             onOpen()
         }
-        else if (title === "Message") {
+        else if (title === "Tin nhắn") {
             navigate("/message")
         }
-        else if (title === "FriendShip") {
+        else if (title === "Bạn bè") {
             navigate("/friendship")
         }
-        else if(title === "Notification"){
+        else if(title === "Thông báo"){
             navigate("/Notification")
         }
         setActiveTab(title)
@@ -124,7 +123,7 @@ const Slidebar = () => {
                 <div className='flex flex-col justify-between h-full'>
                     <div>
                         <div className='pt-10 flex items-center justify-between'>
-                            {activeTab !== "Search" && <img src={img} alt="Logo" className='w-20' />}
+                            {activeTab !== "Tìm kiếm" && <img src={img} alt="Logo" className='w-20' />}
                             <div className="ml-4"><NotificationBell hasUnread={hasUnread} /></div>
                         </div>
                         <div className='mt-10'>
@@ -132,7 +131,7 @@ const Slidebar = () => {
                                 SlieItems.map((item, index) => (
                                     <div key={index} onClick={() => handleOnTab(item.title)} className='flex items-center cursor-pointer text-lg mb-5'>
                                         <p>{item.title === activeTab ? item.iactiveIcon : item.icon}</p>
-                                        {activeTab !== "Search" && <p className={item.title === activeTab ? 'font-bold' : 'font-semibold'}>{item.title}</p>}
+                                        {activeTab !== "Tìm kiếm" && <p className={item.title === activeTab ? 'font-bold' : 'font-semibold'}>{item.title}</p>}
                                     </div>
                                 ))
                             }
@@ -145,22 +144,15 @@ const Slidebar = () => {
                         onClick={handleLogout}
                     >
                         <IoLogOutOutline className="text-2xl mr-3" />
-                        {activeTab !== "Search" && <p className='ml-2 text-lg font-semibold'>Đăng xuất</p>}
+                        {activeTab !== "Tìm kiếm" && <p className='ml-2 text-lg font-semibold'>Đăng xuất</p>}
                     </div>
 
-                    {/* Settings button với animation hover */}
-                    {/* <div
-                        className='flex items-center cursor-pointer pb-10 hover:bg-gray-100 rounded-xl p-3 transition-all duration-300 transform hover:scale-105'
-                        onClick={handleSettingsClick}
-                    >
-                        <IoSettings className="text-gray-600 hover:text-blue-600 transition-colors duration-300" />
-                        {activeTab !== "Search" && <p className='ml-5 text-lg text-gray-600 hover:text-blue-600 transition-colors duration-300'>Setting</p>}
-                    </div> */}
+                    
                 </div>
 
                 {/* Modals */}
 
-                {activeTab === "Search" && <Search handleCloseSearch={handleCloseSearch} />}
+                {activeTab === "Tìm kiếm" && <Search handleCloseSearch={handleCloseSearch} />}
 
             </div>
             <SettingsModal

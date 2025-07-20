@@ -14,7 +14,7 @@ const GroupMembersModal = ({isOpen, onClose, id}) => {
 
   useEffect(()=>{
     getMembers()
-  }, [])
+  }, [isOpen])
 
   const getMembers = async()=>{
     try {
@@ -22,10 +22,7 @@ const GroupMembersModal = ({isOpen, onClose, id}) => {
         console.log(response.data);
         setMembers(response.data)
         const u = response.data.find((item)=>item.id === user.id)
-        console.log(u);
         console.log("Hair");
-        
-        
         setCurrentUserRole(u.role)
     } catch (error) {
         
@@ -36,15 +33,14 @@ const GroupMembersModal = ({isOpen, onClose, id}) => {
   const filteredMembers = members.filter(member =>
     member.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Xóa thành viên (chỉ admin mới được phép)
-  const handleDeleteMember = (memberId) => {
-    if (currentUserRole !== 'ADMIN') {
-      alert('Bạn không có quyền xóa thành viên!');
-      return;
-    }
-    
-    if (window.confirm('Bạn có chắc chắn muốn xóa thành viên này?')) {
-      setMembers(members.filter(member => member.id !== memberId));
+  
+  const handleDeleteMember = async(memberId) => {
+    try {
+      await axiosInstance.delete(`/api/groups/${id}/members/${memberId}`)
+      alert("Đã xóa thành công một thành viên")
+      getMembers()
+    } catch (error) {
+      alert("Đã sảy ra lỗi")
     }
   };
 

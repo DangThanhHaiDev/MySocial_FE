@@ -17,11 +17,10 @@ import BottomNavBar from "../../Components/Slidebar/BottomNavBar"
 const Router = () => {
 
     const theme = useSelector(state => state.theme.theme); 
-    const dispatch = useDispatch()
 
 
     useEffect(() => {
-        console.log("Thêm" + theme);
+        
 
     }, [theme])
     return (

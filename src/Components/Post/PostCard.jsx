@@ -1,7 +1,5 @@
 import {
-  BsBookmark,
-  BsBookmarkFill,
-  BsEmojiSmile,
+
   BsThreeDots
 } from "react-icons/bs";
 import {
@@ -9,10 +7,8 @@ import {
   AiFillHeart
 } from "react-icons/ai";
 import { FaRegComment, FaThumbsUp, FaLaugh, FaSadTear, FaAngry, FaSurprise } from "react-icons/fa";
-import { RiSendPlaneLine } from "react-icons/ri";
 import CommentModal from "../Comment/CommentModal";
-import { useDisclosure } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import url from "../../AppConfig/urlApp";
 import "./postcard.scss";
 import { useDispatch, useSelector } from "react-redux";
@@ -21,11 +17,12 @@ import { Stomp } from "@stomp/stompjs";
 import ConfirmDeleteModal from "./DeletedPostConfirm"
 import { useOnScreen } from "../../hooks/useOnScreen";
 
-import { useRef } from "react";
-import axiosInstance from "../../AppConfig/axiosConfig";
 import { useNavigate } from "react-router-dom";
 import { Globe, UserCheck, UserLock } from "lucide-react";
 import { getUserByJwt } from "../../GlobalState/auth/Action";
+import ReactionModal from "../Message/ReactionModal";
+import ReportModal from "./ReportModal";
+import axiosInstance from "../../AppConfig/axiosConfig";
 
 const PostCard = ({ post }) => {
   const [showDropDown, setShowDropDown] = useState(false);
@@ -38,7 +35,13 @@ const PostCard = ({ post }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [showFullContent, setShowFullContent] = useState(false);
-  
+  const [isDeleted, setIsDeleted] = useState(false)
+  const [isOpenReactionModal, setIsOpenReactionModal] = useState(false)
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const menuRef = useRef();
+
+
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const stompClient = useRef(null);
@@ -61,11 +64,11 @@ const PostCard = ({ post }) => {
 
   const handleDelete = async () => {
     try {
-      const response = await axiosInstance.delete(`/api/post/${post.id}`)
-      const { data } = response
+      await axiosInstance.delete(`/api/post/${post.id}`)
       alert("Đã xóa thành công")
       setIsModalOpen(false)
       dispatch(getUserByJwt(navigate))
+      setIsDeleted(true)
     } catch (error) {
       console.error('Error deleting post:', error)
       alert("Vui lòng thử lại sau")
@@ -97,9 +100,9 @@ const PostCard = ({ post }) => {
     }
   };
 
-  const sendComment = (commentText, parentId = null) => {
+  const sendComment = (commentText, parentId = null, hashtag) => {
     if (stompClient.current && stompClient.current.connected) {
-      const request = { content: commentText };
+      const request = { content: commentText, hashtag };
       if (parentId) request.parentId = parentId;
       stompClient.current.send(`/app/comments/${post.id}`, {}, JSON.stringify(request));
       setCommentTreeReloadKey(prev => prev + 1);
@@ -109,7 +112,7 @@ const PostCard = ({ post }) => {
   };
 
   const handleClickDropDown = () => setShowDropDown(!showDropDown);
-  
+
   const handleClickLike = () => {
     if (isPostLiked) {
       setIsPostLiked(null)
@@ -117,7 +120,7 @@ const PostCard = ({ post }) => {
     }
     setIsPostLiked(!isPostLiked);
   }
-  
+
   const handleOpenCommentModal = () => {
     onOpen()
   };
@@ -126,12 +129,12 @@ const PostCard = ({ post }) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
+
     if (diffInSeconds < 60) return 'vừa xong';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút trước`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày trước`;
-    
+
     return date.toLocaleDateString("vi-VN", {
       day: "2-digit",
       month: "2-digit",
@@ -216,20 +219,31 @@ const PostCard = ({ post }) => {
     };
   }, [isVisible]);
 
-  // Click outside để đóng dropdown
   useEffect(() => {
-    const handleClickOutside = () => {
-      if (showDropDown) setShowDropDown(false);
-      if (showReactions) setShowReactions(false);
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
     };
+    if (showMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showMenu]);
 
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [showDropDown, showReactions]);
-
+  const closeReactionModal = ()=>{
+    setIsOpenReactionModal(false)
+  }
+  if(isDeleted ){
+    return null
+  }
   return (
-    <div 
-      ref={ref} 
+    <div
+      ref={ref}
       className="max-w-xl mx-auto bg-white border rounded-xl shadow-md mb-8 overflow-hidden hover:shadow-lg transition-shadow duration-300"
     >
       {/* Header */}
@@ -243,7 +257,7 @@ const PostCard = ({ post }) => {
           />
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <p 
+              <p
                 className="font-semibold text-sm text-left cursor-pointer hover:underline"
                 onClick={() => handleNav(post.user.id)}
               >
@@ -251,15 +265,15 @@ const PostCard = ({ post }) => {
               </p>
               {getPrivacyIcon(post.privacy)}
             </div>
-            
+
             {post.location && (
               <p className="text-xs text-gray-500 text-left">{post.location}</p>
             )}
-            
+
             <p className="text-xs text-gray-500 text-left">
               {formatTime(post.createdAt)}
             </p>
-            
+
             {post.avatar && (
               <p className="text-xs text-gray-600 italic">
                 {post.user.firstName + " " + post.user.lastName} đã cập nhật ảnh đại diện
@@ -267,26 +281,27 @@ const PostCard = ({ post }) => {
             )}
           </div>
         </div>
-        
-        <div className="relative" onClick={(e) => e.stopPropagation()}>
-          {user?.id === post.user.id && (
-            <BsThreeDots 
-              className="cursor-pointer hover:opacity-60 p-1 rounded-full hover:bg-gray-100 transition-colors" 
-              size={20}
-              onClick={handleClickDropDown} 
-            />
-          )}
-          {showDropDown && (
-            <div className="absolute right-0 mt-2 bg-white border rounded-lg shadow-lg px-3 py-2 z-10 min-w-[120px]">
-              <p 
-                className="cursor-pointer hover:bg-gray-100 p-2 rounded text-sm text-red-600 hover:text-red-700 transition-colors" 
-                onClick={() => {
-                  setIsModalOpen(true);
-                  setShowDropDown(false);
-                }}
-              >
-                Xóa bài viết
-              </p>
+
+        <div className="relative inline-block">
+          <button onClick={() => setShowMenu(!showMenu)} className="px-2 py-1 text-xl"><BsThreeDots /></button>
+          {showMenu && (
+            <div ref={menuRef} className="absolute right-0 bg-white shadow rounded z-10 min-w-[150px]">
+              {user?.id === post.user.id && (
+                <button
+                  className="block w-full px-4 py-2 text-left hover:bg-gray-100 text-red-600"
+                  onClick={() => { setIsModalOpen(true); setShowMenu(false); }}
+                >
+                  Xóa bài viết
+                </button>
+              )}
+              {user?.id !== post.user.id && (
+                <button
+                  className="block w-full px-4 py-2 text-left hover:bg-gray-100"
+                  onClick={() => { setShowReport(true); setShowMenu(false); }}
+                >
+                  Báo cáo bài viết
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -310,28 +325,31 @@ const PostCard = ({ post }) => {
       )}
 
       {/* Image */}
-      {post.image && (
-        <div className="w-full relative">
-          {isImageLoading && (
-            <div className="w-full h-64 bg-gray-200 animate-pulse flex items-center justify-center">
-              <div className="text-gray-400">Đang tải...</div>
+      {post.images && post.images.length > 0 && (
+        <div className={`w-full relative ${post.images.length >1 ? "flex gap-2" :"w-full"}`}>
+          {post.images.slice(0, 2).map((img, idx) => (
+            <div key={idx} className="relative" >
+              <img
+                src={url + img}
+                alt={`Post ${idx + 1}`}
+                className={`${post.images.length >1 ? "w-48 h-48" :"w-full"} object-cover rounded cursor-pointer`}
+                onClick={()=> window.open(url + img)}
+              />
+              {/* Nếu là ảnh thứ 2 và còn nhiều hơn 2 ảnh, hiển thị text 'Xem thêm ... ảnh' */}
+              {idx === 1 && post.images.length > 2 && (
+                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center rounded cursor-pointer" onClick={() => setIsOpen(true)}>
+                  <span className="text-white font-semibold text-lg">Xem thêm {post.images.length - 2} ảnh</span>
+                </div>
+              )}
             </div>
-          )}
-          <img
-            src={url + post.image}
-            alt="Post"
-            className={`w-full object-cover cursor-pointer hover:opacity-95 transition-opacity ${isImageLoading ? 'hidden' : 'block'}`}
-            onClick={() => window.open(url + post.image)}
-            onLoad={() => setIsImageLoading(false)}
-            onError={() => setIsImageLoading(false)}
-          />
+          ))}
         </div>
       )}
 
       {/* Action buttons */}
       <div className="flex justify-between items-center px-5 py-3 relative">
-        <div 
-          className="relative group" 
+        <div
+          className="relative group"
           onMouseEnter={() => setShowReactions(true)}
           onMouseLeave={() => setShowReactions(false)}
           onClick={(e) => e.stopPropagation()}
@@ -346,16 +364,16 @@ const PostCard = ({ post }) => {
                   {fixedReactions.find(r => r.type === isPostLiked).icon}
                 </span>
               ) : (
-                <AiOutlineHeart 
-                  className="text-2xl cursor-pointer hover:scale-110 transition-transform hover:text-red-500" 
+                <AiOutlineHeart
+                  className="text-2xl cursor-pointer hover:scale-110 transition-transform hover:text-red-500"
                   onClick={() => handleReaction('LIKE')}
                 />
               )}
             </div>
-            
-            <FaRegComment 
-              onClick={handleOpenCommentModal} 
-              className="text-xl cursor-pointer hover:scale-110 transition-transform hover:text-blue-500" 
+
+            <FaRegComment
+              onClick={handleOpenCommentModal}
+              className="text-xl cursor-pointer hover:scale-110 transition-transform hover:text-blue-500"
             />
           </div>
 
@@ -383,14 +401,14 @@ const PostCard = ({ post }) => {
       {/* Likes & Comments */}
       <div className="px-5 pb-4 text-sm">
         {reactionCount > 0 && (
-          <p className="font-semibold text-gray-700 mb-1">
+          <p className="font-semibold text-gray-700 mb-1 hover:underline cursor-pointer" onClick={()=>setIsOpenReactionModal(true)}>
             {reactionCount} lượt thích
           </p>
         )}
-        
+
         {comment && comment.length > 0 && (
-          <p 
-            className="text-gray-500 cursor-pointer hover:underline" 
+          <p
+            className="text-gray-500 cursor-pointer hover:underline"
             onClick={handleOpenCommentModal}
           >
             Xem tất cả {comment.length} bình luận
@@ -408,10 +426,10 @@ const PostCard = ({ post }) => {
         sendComment={sendComment}
         postId={post.id}
         commentTreeReloadKey={commentTreeReloadKey}
-        imageUrl={post.image}
+        images={post.images}
         render={setComment}
       />
-      
+
       <ConfirmDeleteModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -419,6 +437,14 @@ const PostCard = ({ post }) => {
         message="Bạn có chắc chắn muốn xóa bài viết này không?"
         onConfirm={handleDelete}
       />
+      <ReactionModal isOpen={isOpenReactionModal} reactions={post.reactions} onClose={closeReactionModal} postId={post.id}/>
+      {showReport && (
+        <ReportModal
+          type="POST"
+          targetId={post.id}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 };
